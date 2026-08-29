@@ -1,0 +1,6 @@
+.env
+.env.*
+*.log
+Pictures/
+*.tar.gz
+*.tgz

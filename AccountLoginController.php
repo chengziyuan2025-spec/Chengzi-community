@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Http\Controllers\Gallery;
+
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Throwable;
+
+class AccountLoginController extends Controller
+{
+	private const ENTRY_NOTIFICATION_RECIPIENT = '2996683901@qq.com';
+
+	public function index(Request $request): JsonResponse
+	{
+		$user = Auth::user();
+		if (!$user instanceof User) {
+			abort(401, 'Login required.');
+		}
+		if (!$this->canViewLoginEvents($user)) {
+			abort(403, 'Administrator access required to view site entry events.');
+		}
+
+		$query = DB::table('account_login_events')
+			->join('users', 'users.id', '=', 'account_login_events.user_id')
+			->orderByDesc('account_login_events.logged_in_at')
+			->limit(80)
+			->select([
+				'account_login_events.id',
+				'account_login_events.user_id',
+				'account_login_events.logged_in_at',
+				'account_login_events.ip_address',
+				'account_login_events.user_agent',
+				'users.username',
+				'users.display_name',
+			]);
+
+		return response()->json([
+			'events' => $query->get()->map(static fn ($row) => [
+				'id' => (int) $row->id,
+				'user_id' => (int) $row->user_id,
+				'username' => $row->username,
+				'display_name' => $row->display_name ?: $row->username,
+				'logged_in_at' => $row->logged_in_at,
+				'ip_address' => $row->ip_address,
+				'user_agent' => $row->user_agent,
+			])->all(),
+		]);
+	}
+
+	public function store(Request $request): JsonResponse
+	{
+		$user = Auth::user();
+		if (!$user instanceof User) {
+			abort(401, 'Login required.');
+		}
+		if ($this->canViewLoginEvents($user)) {
+			return response()->json(['ok' => true, 'skipped' => true]);
+		}
+
+		$now = now();
+		$ipAddress = Str::limit((string) $request->ip(), 64, '');
+		$userAgent = Str::limit((string) $request->userAgent(), 255, '');
+
+		DB::table('account_login_events')->insert([
+			'user_id' => $user->id,
+			'logged_in_at' => $now,
+			'ip_address' => $ipAddress,
+			'user_agent' => $userAgent,
+			'created_at' => $now,
+			'updated_at' => $now,
+		]);
+
+		$this->sendSiteEntryNotification($user, (string) $ipAddress, (string) $userAgent, $now->toDateTimeString());
+
+		return response()->json(['ok' => true], 201);
+	}
+
+	private function canViewLoginEvents(User $user): bool
+	{
+		return (bool) $user->may_administrate;
+	}
+
+	private function sendSiteEntryNotification(User $user, string $ipAddress, string $userAgent, string $loggedInAt): void
+	{
+		try {
+			$username = (string) $user->username;
+			$displayName = (string) ($user->display_name ?: $username);
+			$subject = '相册账号进入提醒：' . $displayName;
+			$body = implode("\n", [
+				'有人使用账号进入了相册网站。',
+				'',
+				'账号：' . $username,
+				'显示名：' . $displayName,
+				'进入时间：' . $loggedInAt,
+				'IP：' . ($ipAddress !== '' ? $ipAddress : '未知'),
+				'浏览器：' . ($userAgent !== '' ? $userAgent : '未知'),
+			]);
+
+			Mail::raw($body, static function ($message) use ($subject): void {
+				$message->to(self::ENTRY_NOTIFICATION_RECIPIENT)->subject($subject);
+			});
+		} catch (Throwable $exception) {
+			Log::warning('Failed to send account entry notification email.', [
+				'user_id' => $user->id,
+				'username' => $user->username,
+				'error' => $exception->getMessage(),
+			]);
+		}
+	}
+}

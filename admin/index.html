@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<meta name="robots" content="noindex, nofollow, noarchive">
+	<title>管理员中心</title>
+	<link rel="stylesheet" href="./admin.css?v=20260717-1131">
+</head>
+<body>
+	<header class="admin-header">
+		<a class="admin-brand" href="/gallery">cw小窝</a>
+		<div id="admin-user" class="admin-user" hidden></div>
+	</header>
+	<main class="admin-main">
+		<section id="admin-login" class="auth-panel" hidden aria-labelledby="login-title">
+			<p class="section-label">管理员中心</p>
+			<h1 id="login-title">登录后继续</h1>
+			<p class="section-copy">请使用你的相册账号登录。</p>
+			<form id="admin-login-form">
+				<label><span>用户名</span><input id="admin-username" name="username" autocomplete="username" required></label>
+				<label><span>密码</span><input id="admin-password" name="password" type="password" autocomplete="current-password" required></label>
+				<label class="remember-row"><input id="admin-remember" name="remember_me" type="checkbox"><span>保持登录</span></label>
+				<button id="admin-login-submit" class="button button-primary" type="submit">登录</button>
+				<p id="admin-login-error" class="form-message" role="alert"></p>
+			</form>
+		</section>
+		<section id="admin-denied" class="notice-panel" hidden aria-labelledby="denied-title">
+			<p class="section-label">访问受限</p>
+			<h1 id="denied-title">此账号没有管理员权限</h1>
+			<p class="section-copy">进入记录仅对相册管理员开放。</p>
+			<div class="action-row"><a class="button" href="/gallery">返回相册</a><button id="admin-denied-logout" class="button button-primary" type="button">退出登录</button></div>
+		</section>
+		<section id="admin-dashboard" hidden aria-labelledby="events-title">
+			<div class="page-heading">
+				<div><p class="section-label">管理员中心</p><h1 id="events-title">进入记录</h1><p class="section-copy">最近 80 次相册账号进入记录。</p></div>
+				<div class="action-row"><a class="button" href="/gallery">返回相册</a><button id="admin-refresh" class="button" type="button">刷新</button><button id="admin-logout" class="button button-primary" type="button">退出登录</button></div>
+			</div>
+			<p id="admin-status" class="status-message" role="status" aria-live="polite"></p>
+			<section class="security-panel" aria-labelledby="security-title">
+				<div class="panel-heading">
+					<div><p class="section-label">登录安全</p><h2 id="security-title">设备访问限制</h2></div>
+					<button id="security-refresh" class="button" type="button">刷新安全设置</button>
+				</div>
+				<div class="current-device">
+					<div><h3>当前设备</h3><p id="security-current-device" class="security-copy">正在读取设备状态...</p></div>
+					<button id="security-trust-current" class="button button-primary" type="button" disabled>信任当前设备</button>
+				</div>
+				<label class="security-toggle"><input id="security-desktop-protection" type="checkbox" disabled><span><strong>仅允许已信任的电脑登录</strong><small>开启后，未信任的电脑将在登录前被拒绝。</small></span></label>
+				<p id="security-status" class="security-status" role="status" aria-live="polite"></p>
+				<div class="trusted-devices-heading"><h3>已信任的设备</h3><span id="security-device-count" class="device-count"></span></div>
+				<div id="security-trusted-devices" class="trusted-device-list" aria-live="polite"></div>
+			</section>
+			<section class="audit-panel" aria-labelledby="audit-title">
+				<div class="panel-heading">
+					<div><p class="section-label">操作审计</p><h2 id="audit-title">操作日志</h2><p class="panel-copy">记录相册 API 写入操作的结果，不包含密码、令牌和内容正文。</p></div>
+					<button id="audit-refresh" class="button" type="button">刷新日志</button>
+				</div>
+				<form id="audit-filters" class="audit-filters">
+					<label for="audit-action"><span>操作</span><input id="audit-action" name="action" type="search" autocomplete="off" placeholder="例如 photo.upload"></label>
+					<label for="audit-actor"><span>账号</span><input id="audit-actor" name="actor" type="search" autocomplete="off" placeholder="用户名或显示名称"></label>
+					<label for="audit-status"><span>结果</span><select id="audit-status" name="status"><option value="">全部结果</option><option value="success">成功</option><option value="rejected">已拒绝</option><option value="failed">失败</option></select></label>
+					<button id="audit-filter-submit" class="button button-primary" type="submit">筛选</button>
+				</form>
+				<p id="audit-status-message" class="status-message" role="status" aria-live="polite"></p>
+				<div id="audit-events" class="audit-event-list" aria-live="polite"></div>
+				<div class="audit-pagination" aria-label="操作日志分页">
+					<button id="audit-previous" class="button" type="button">上一页</button>
+					<p id="audit-page-indicator" class="audit-page-indicator" aria-live="polite">第 1 页</p>
+					<button id="audit-next" class="button" type="button">下一页</button>
+				</div>
+			</section>
+			<div id="entry-events" class="event-list" aria-live="polite"></div>
+		</section>
+	</main>
+	<script src="./admin.js?v=20260717-1131" defer></script>
+</body>
+</html>
