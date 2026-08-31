@@ -2,10 +2,14 @@
 
 use App\Http\Controllers\Gallery\AccountLoginController;
 use App\Http\Controllers\Gallery\ActivityController;
+use App\Http\Controllers\Gallery\AuthRegisterController;
 use App\Http\Controllers\Gallery\LoginSecurityController;
 use App\Http\Controllers\Gallery\OperationAuditController;
 use App\Http\Middleware\GalleryApiMiddleware;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/Auth::register', [AuthRegisterController::class, 'register'])
+	->middleware([GalleryApiMiddleware::class, 'throttle:10,1']);
 
 Route::middleware(['login_required:always', GalleryApiMiddleware::class])->group(function (): void {
 	Route::get('/AccountLoginEvents', [AccountLoginController::class, 'index']);

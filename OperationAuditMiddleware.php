@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,11 +16,6 @@ use Throwable;
 class OperationAuditMiddleware
 {
 	private const MUTATION_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
-
-	private const PEER_ACTIVITY_RECIPIENTS = [
-		'cheng' => 'wuyiling-510@qq.com',
-		'wu' => '2996683901@qq.com',
-	];
 
 	public function handle(Request $request, Closure $next): Response
 	{
@@ -35,7 +29,6 @@ class OperationAuditMiddleware
 			$status = $response->getStatusCode();
 			$action = $this->action($request);
 			$this->record($request, $status, $actor, $action);
-			$this->notifyPeerOfActivity($actor, $action, $status);
 
 			return $response;
 		} catch (Throwable $exception) {
@@ -76,38 +69,6 @@ class OperationAuditMiddleware
 			// The business response must not fail only because audit persistence is unavailable.
 			Log::warning('Unable to persist gallery operation audit event.', [
 				'route' => $this->limit('/' . trim($request->path(), '/'), 255),
-				'error' => $exception->getMessage(),
-			]);
-		}
-	}
-
-	/** @param array{user_id: int|null, username: string|null} $actor */
-	private function notifyPeerOfActivity(array $actor, string $action, int $status): void
-	{
-		if ($status < 200 || $status >= 300) {
-			return;
-		}
-		$actionLabel = [
-			'photo.upload' => '上传了新照片',
-			'activity.create' => '发布了新动态',
-		][$action] ?? null;
-		$actorName = trim((string) ($actor['username'] ?? ''));
-		$recipient = self::PEER_ACTIVITY_RECIPIENTS[strtolower($actorName)] ?? null;
-		if ($actionLabel === null || $recipient === null) {
-			return;
-		}
-
-		try {
-			Mail::raw(
-				$actorName . $actionLabel . '。',
-				static function ($message) use ($recipient, $actorName, $actionLabel): void {
-					$message->to($recipient)->subject('相册活动提醒：' . $actorName . $actionLabel);
-				}
-			);
-		} catch (Throwable $exception) {
-			Log::warning('Unable to send peer gallery activity notification.', [
-				'actor' => $actorName,
-				'action' => $action,
 				'error' => $exception->getMessage(),
 			]);
 		}

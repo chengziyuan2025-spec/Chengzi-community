@@ -31,21 +31,41 @@
 
 		<section id="login-view" class="login-shell" hidden>
 			<form id="login-form" class="login-panel">
-				<h1>登录相册</h1>
-				<p>请输入 Chengzi 账号后访问相册内容。</p>
-				<label>
-					<span>用户名</span>
-					<input id="login-username" name="username" autocomplete="username" required>
-				</label>
-				<label>
-					<span>密码</span>
-					<input id="login-password" name="password" type="password" autocomplete="current-password" required>
-				</label>
-				<label class="check-row">
-					<input id="login-remember" name="remember_me" type="checkbox">
-					<span>保持登录</span>
-				</label>
-				<button class="btn btn-primary" type="submit">登录</button>
+				<div class="auth-tabs" role="tablist" aria-label="登录或注册">
+					<button class="auth-tab is-active" type="button" role="tab" aria-selected="true" data-action="set-auth-mode" data-mode="login">登录</button>
+					<button class="auth-tab" type="button" role="tab" aria-selected="false" data-action="set-auth-mode" data-mode="register">注册</button>
+				</div>
+				<h1 id="auth-title">登录社区</h1>
+				<p id="auth-subtitle">请输入账号后查看大家的动态。</p>
+				<div id="auth-login-fields">
+					<label>
+						<span>用户名</span>
+						<input id="login-username" name="username" autocomplete="username" required>
+					</label>
+					<label>
+						<span>密码</span>
+						<input id="login-password" name="password" type="password" autocomplete="current-password" required>
+					</label>
+					<label class="check-row">
+						<input id="login-remember" name="remember_me" type="checkbox">
+						<span>保持登录</span>
+					</label>
+				</div>
+				<div id="auth-register-fields" hidden>
+					<label>
+						<span>用户名</span>
+						<input id="register-username" name="register_username" autocomplete="username" maxlength="40" required>
+					</label>
+					<label>
+						<span>密码</span>
+						<input id="register-password" name="register_password" type="password" autocomplete="new-password" minlength="8" required>
+					</label>
+					<label>
+						<span>确认密码</span>
+						<input id="register-password-confirm" name="register_password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
+					</label>
+				</div>
+				<button id="auth-submit" class="btn btn-primary" type="submit">登录</button>
 				<p id="login-error" class="form-error" role="alert"></p>
 			</form>
 		</section>
@@ -62,47 +82,27 @@
 						<span id="profile-username"></span>
 					</div>
 				</section>
-				<section class="profile-stats" aria-label="相册统计">
-					<div class="profile-stat"><strong id="stat-albums">--</strong><span>个相册</span></div>
-					<div class="profile-stat"><strong id="stat-photos">--</strong><span>张照片</span></div>
-				</section>
 				<button class="btn btn-danger profile-logout" type="button" data-action="logout">退出登录</button>
 			</div>
 		</section>
 
 		<section id="activities-view" hidden>
-			<nav class="content-switcher animate-up" aria-label="内容切换" role="tablist">
-				<button class="content-switcher-item" type="button" data-action="open-activities" data-switch-view="activities-view" role="tab">动态</button>
-				<button class="content-switcher-item" type="button" data-action="open-albums" data-switch-view="albums-view" role="tab">相册</button>
-			</nav>
+			<div class="activities-feed-header">
+				<div>
+					<p class="activities-feed-eyebrow">COMMUNITY FEED</p>
+					<h1 class="activities-feed-title">发现动态</h1>
+					<p class="activities-feed-subtitle">看看大家正在分享的画面。</p>
+				</div>
+				<div class="activities-feed-tabs" role="tablist" aria-label="动态筛选">
+					<button class="activities-feed-tab is-active" type="button" role="tab" aria-selected="true" data-action="set-activity-filter" data-filter="all">全部</button>
+					<button class="activities-feed-tab" type="button" role="tab" aria-selected="false" data-action="set-activity-filter" data-filter="image">图片</button>
+					<button class="activities-feed-tab" type="button" role="tab" aria-selected="false" data-action="set-activity-filter" data-filter="video">视频</button>
+				</div>
+			</div>
 			<div id="activities-loading" class="activity-loading">正在加载动态...</div>
 			<div id="activities-feed" class="activities-feed"></div>
 			<button id="activities-load-more" class="activity-load-more" type="button" data-action="load-more-activities" hidden>加载更多动态</button>
 			<div id="activities-empty" class="empty-state" hidden>还没有动态。发布第一条，留下今天的画面。</div>
-		</section>
-
-		<section id="albums-view" hidden>
-			<nav class="content-switcher animate-up" aria-label="内容切换" role="tablist">
-				<button class="content-switcher-item" type="button" data-action="open-activities" data-switch-view="activities-view" role="tab">动态</button>
-				<button class="content-switcher-item" type="button" data-action="open-albums" data-switch-view="albums-view" role="tab">相册</button>
-			</nav>
-			<div class="view-header animate-up">
-				<div>
-					<h1 class="view-title">全部相册</h1>
-				</div>
-				<div class="toolbar">
-					<button class="btn" type="button" data-action="toggle-join-code" hidden>加入共享相册</button>
-				</div>
-			</div>
-			<form id="join-album-form" class="share-code-panel animate-up" hidden>
-				<label>
-					<span>共享码</span>
-					<input id="join-code-input" name="code" maxlength="32" autocomplete="off" inputmode="latin" placeholder="例如 wbch234">
-				</label>
-				<button class="btn btn-primary" type="submit">加入</button>
-			</form>
-			<div class="grid-container" id="albums-grid"></div>
-			<div class="empty-state" id="albums-empty" hidden>还没有可访问的相册。</div>
 		</section>
 
 		<section id="activity-compose-view" class="compose-view" hidden>
@@ -124,58 +124,6 @@
 					</form>
 				</section>
 			</div>
-		</section>
-
-		<section id="album-create-view" class="compose-view" hidden>
-			<div class="compose-page-shell compose-page-shell-compact">
-				<button class="back-link compose-back" type="button" data-action="close-compose" aria-label="返回相册"><span aria-hidden="true">&larr;</span></button>
-				<div class="compose-heading">
-					<p class="eyebrow">新相册</p>
-					<h1 class="compose-title">创建一个新空间</h1>
-					<p class="compose-subtitle">为即将发生的故事，先留出一个位置。</p>
-				</div>
-				<form id="create-album-form" class="compose-form-surface album-create-form">
-					<label><span>相册名称</span><input id="create-album-title" name="title" maxlength="100" autocomplete="off" placeholder="输入新相册名称"></label>
-					<div class="compose-form-actions"><span class="card-meta">名称最多 100 个字符</span><button class="btn btn-primary" type="submit">创建相册</button></div>
-				</form>
-			</div>
-		</section>
-
-
-		<section id="photos-view" hidden>
-			<div class="photos-titlebar">
-				<button class="back-link" type="button" data-action="open-albums" aria-label="返回相册"><span aria-hidden="true">&larr;</span></button>
-				<h1 class="view-title" id="current-album-title">相册</h1>
-				<div class="toolbar">
-					<button class="btn" type="button" data-action="generate-share-code" hidden>生成共享码</button>
-					<button class="btn btn-primary" type="button" data-action="pick-files" hidden>上传照片</button>
-					<button class="btn btn-danger" type="button" data-action="delete-album" hidden>删除相册</button>
-					<input type="file" id="file-input" accept="image/*,video/*" multiple>
-				</div>
-			</div>
-			<div id="delete-album-confirm" class="share-code-panel" hidden>
-				<span>确定要删除这个相册吗？其内的照片也会被删除。</span>
-				<button class="btn btn-danger" type="button" data-action="confirm-delete-album">确认删除</button>
-				<button class="btn" type="button" data-action="cancel-delete-album">取消</button>
-			</div>
-			<div id="share-code-panel" class="share-code-panel" hidden>
-				<div>
-					<span class="share-code-label">共享码</span>
-					<strong id="share-code-value" class="share-code-value"></strong>
-				</div>
-				<button class="btn" type="button" data-action="copy-share-code">复制</button>
-			</div>
-			<div id="upload-status" class="upload-status" hidden></div>
-			<section id="new-photos-section" class="new-photos-section" aria-labelledby="new-photos-title" hidden>
-				<div class="new-photos-heading">
-					<div><p class="eyebrow">新上传的照片</p><h2 id="new-photos-title">对方新上传</h2></div>
-					<p id="new-photo-count"></p>
-				</div>
-				<div class="grid-container new-photos-grid" id="new-photos-grid"></div>
-			</section>
-			<div class="grid-container" id="photos-grid"></div>
-			<button id="photos-load-more" class="activity-load-more" type="button" data-action="load-more-photos" hidden>加载更多照片</button>
-			<div class="empty-state" id="photos-empty" hidden>这个相册还没有照片。</div>
 		</section>
 	</main>
 
@@ -218,35 +166,6 @@
 				</section>
 			</div>
 		</article>
-	</div>
-
-	<div class="modal-overlay" id="photo-modal" aria-hidden="true">
-		<div class="lightbox-content" role="dialog" aria-modal="true" aria-label="照片预览">
-			<button class="close-btn" type="button" data-action="close-photo" aria-label="关闭">x</button>
-			<div class="lightbox-img">
-				<img id="lightbox-image" src="" alt="">
-			</div>
-			<section class="photo-note-panel" aria-label="照片标题">
-				<form class="photo-title-form" id="photo-title-form">
-					<input type="text" id="photo-title-input" maxlength="100" autocomplete="off" placeholder="标题" aria-label="照片标题">
-				</form>
-				<div class="photo-note-meta">
-					<span id="photo-note-date"></span>
-				</div>
-			</section>
-			<aside class="lightbox-sidebar">
-				<div class="lightbox-header">
-					<strong id="lightbox-title">评论区</strong>
-					<span id="comment-count"></span>
-				</div>
-				<div class="comment-list" id="comment-list"></div>
-				<form class="comment-input-area" id="comment-form">
-					<div class="reply-target" id="reply-target" hidden></div>
-					<input type="text" id="comment-input" maxlength="500" autocomplete="off" placeholder="说点什么...">
-					<button class="btn btn-primary" type="submit">发送</button>
-				</form>
-			</aside>
-		</div>
 	</div>
 
 	<div class="toast" id="toast" hidden></div>

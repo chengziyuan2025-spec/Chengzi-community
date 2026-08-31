@@ -8,14 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Throwable;
 
 class AccountLoginController extends Controller
 {
-	private const ENTRY_NOTIFICATION_RECIPIENT = '2996683901@qq.com';
 
 	public function index(Request $request): JsonResponse
 	{
@@ -77,41 +73,11 @@ class AccountLoginController extends Controller
 			'updated_at' => $now,
 		]);
 
-		$this->sendSiteEntryNotification($user, (string) $ipAddress, (string) $userAgent, $now->toDateTimeString());
-
 		return response()->json(['ok' => true], 201);
 	}
 
 	private function canViewLoginEvents(User $user): bool
 	{
 		return (bool) $user->may_administrate;
-	}
-
-	private function sendSiteEntryNotification(User $user, string $ipAddress, string $userAgent, string $loggedInAt): void
-	{
-		try {
-			$username = (string) $user->username;
-			$displayName = (string) ($user->display_name ?: $username);
-			$subject = '相册账号进入提醒：' . $displayName;
-			$body = implode("\n", [
-				'有人使用账号进入了相册网站。',
-				'',
-				'账号：' . $username,
-				'显示名：' . $displayName,
-				'进入时间：' . $loggedInAt,
-				'IP：' . ($ipAddress !== '' ? $ipAddress : '未知'),
-				'浏览器：' . ($userAgent !== '' ? $userAgent : '未知'),
-			]);
-
-			Mail::raw($body, static function ($message) use ($subject): void {
-				$message->to(self::ENTRY_NOTIFICATION_RECIPIENT)->subject($subject);
-			});
-		} catch (Throwable $exception) {
-			Log::warning('Failed to send account entry notification email.', [
-				'user_id' => $user->id,
-				'username' => $user->username,
-				'error' => $exception->getMessage(),
-			]);
-		}
 	}
 }

@@ -1236,6 +1236,11 @@ main { padding-top: 28px; padding-bottom: 64px; }
 .login-panel input:focus { transform: translateY(-1px); border-color: rgba(49, 94, 251, .65); box-shadow: 0 0 0 4px rgba(49, 94, 251, .12); }
 .login-panel .btn-primary { width: 100%; margin-top: 24px; min-height: 48px; }
 
+.auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; padding: 5px; border: 1px solid var(--micro-line); border-radius: 14px; background: rgba(255, 255, 255, .5); }
+.auth-tab { flex: 1; min-height: 38px; border: 0; border-radius: 10px; background: transparent; color: var(--micro-muted); font-weight: 600; font-size: .95rem; cursor: pointer; transition: background .25s ease, color .25s ease, box-shadow .25s ease; }
+.auth-tab.is-active { background: var(--micro-ink); color: #fff; box-shadow: 0 6px 16px rgba(24, 33, 43, .18); }
+.auth-tab:focus-visible { outline: 2px solid rgba(49, 94, 251, .55); outline-offset: 2px; }
+
 .home-new { width: min(920px, 100%); margin-top: clamp(18px, 8vh, 80px); gap: 26px; }
 .home-greeting { padding: 10px 0 20px; border-bottom: 0; }
 .home-greeting-line { font-size: clamp(2rem, 6vw, 4.4rem); font-weight: 650; letter-spacing: -.07em; line-height: 1.02; }
@@ -4404,4 +4409,120 @@ body.amicro-enabled .activity-reply-target { background: rgba(255, 255, 255, .08
 @media (max-width: 420px) {
 	#photos-grid { column-count: 2; column-gap: 10px; }
 	#photos-grid .photo-card { margin-bottom: 10px; }
+}
+
+/* Original discovery controls inspired by modern content feeds. */
+body.amicro-enabled #activities-view .activities-feed-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	width: min(800px, 100%);
+	margin: 0 auto 18px;
+	padding: 0 2px 14px;
+	border-bottom: 1px solid rgba(24, 33, 43, .1);
+}
+
+body.amicro-enabled .activities-feed-eyebrow {
+	margin: 0 0 5px;
+	color: #e15d63;
+	font-size: .66rem;
+	font-weight: 750;
+	letter-spacing: .14em;
+}
+
+body.amicro-enabled .activities-feed-title {
+	margin: 0;
+	color: #20242b;
+	font-size: clamp(1.35rem, 3vw, 1.8rem);
+	font-weight: 720;
+	line-height: 1.2;
+}
+
+body.amicro-enabled .activities-feed-subtitle {
+	margin: 6px 0 0;
+	color: #727b86;
+	font-size: .8rem;
+}
+
+body.amicro-enabled .activities-feed-tabs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	border: 1px solid rgba(24, 33, 43, .1);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, .72);
+}
+
+body.amicro-enabled .activities-feed-tab {
+	min-width: 48px;
+	min-height: 30px;
+	padding: 5px 12px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: #727b86;
+	font: inherit;
+	font-size: .76rem;
+	cursor: pointer;
+	transition: color .2s ease, background-color .2s ease, transform .2s ease;
+}
+
+body.amicro-enabled .activities-feed-tab:hover {
+	color: #20242b;
+	transform: translateY(-1px);
+}
+
+body.amicro-enabled .activities-feed-tab.is-active {
+	background: #e15d63;
+	color: #fff;
+	font-weight: 700;
+}
+
+body.amicro-enabled .activities-feed-tab:focus-visible {
+	outline: 2px solid rgba(225, 93, 99, .45);
+	outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+	body.amicro-enabled #activities-view .activities-feed-header {
+	align-items: flex-start;
+	flex-direction: column;
+	gap: 14px;
+	margin-bottom: 14px;
+	padding-inline: 0;
+	}
+	body.amicro-enabled .activities-feed-tabs { width: 100%; }
+	body.amicro-enabled .activities-feed-tab { flex: 1 1 0; }
+}
+
+@media (prefers-color-scheme: dark) {
+	body.amicro-enabled #activities-view .activities-feed-header { border-bottom-color: rgba(255, 255, 255, .12); }
+	body.amicro-enabled .activities-feed-title { color: #f4f6f8; }
+	body.amicro-enabled .activities-feed-subtitle,
+	body.amicro-enabled .activities-feed-tab { color: #aeb7c2; }
+	body.amicro-enabled .activities-feed-tabs { border-color: rgba(255, 255, 255, .14); background: rgba(30, 33, 38, .72); }
+	body.amicro-enabled .activities-feed-tab:hover { color: #f4f6f8; }
+}
+
+body.amicro-enabled #activities-view .activity-card-meta {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 7px;
+	color: #8b949e;
+	font-size: .68rem;
+	line-height: 1.2;
+}
+
+body.amicro-enabled #activities-view .activity-card-meta span + span::before {
+	content: "·";
+	margin-right: 10px;
+	color: #b4bbc3;
+}
+
+@media (prefers-color-scheme: dark) {
+	body.amicro-enabled #activities-view .activity-card-meta { color: #9ba6b2; }
+	body.amicro-enabled #activities-view .activity-card-meta span + span::before { color: #68737f; }
 }

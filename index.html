@@ -20,21 +20,41 @@
 
 		<section id="login-view" class="login-shell" hidden>
 			<form id="login-form" class="login-panel">
-				<h1>登录社区</h1>
-				<p>请输入账号后查看大家的动态。</p>
-				<label>
-					<span>用户名</span>
-					<input id="login-username" name="username" autocomplete="username" required>
-				</label>
-				<label>
-					<span>密码</span>
-					<input id="login-password" name="password" type="password" autocomplete="current-password" required>
-				</label>
-				<label class="check-row">
-					<input id="login-remember" name="remember_me" type="checkbox">
-					<span>保持登录</span>
-				</label>
-				<button class="btn btn-primary" type="submit">登录</button>
+				<div class="auth-tabs" role="tablist" aria-label="登录或注册">
+					<button class="auth-tab is-active" type="button" role="tab" aria-selected="true" data-action="set-auth-mode" data-mode="login">登录</button>
+					<button class="auth-tab" type="button" role="tab" aria-selected="false" data-action="set-auth-mode" data-mode="register">注册</button>
+				</div>
+				<h1 id="auth-title">登录社区</h1>
+				<p id="auth-subtitle">请输入账号后查看大家的动态。</p>
+				<div id="auth-login-fields">
+					<label>
+						<span>用户名</span>
+						<input id="login-username" name="username" autocomplete="username" required>
+					</label>
+					<label>
+						<span>密码</span>
+						<input id="login-password" name="password" type="password" autocomplete="current-password" required>
+					</label>
+					<label class="check-row">
+						<input id="login-remember" name="remember_me" type="checkbox">
+						<span>保持登录</span>
+					</label>
+				</div>
+				<div id="auth-register-fields" hidden>
+					<label>
+						<span>用户名</span>
+						<input id="register-username" name="register_username" autocomplete="username" maxlength="40" required>
+					</label>
+					<label>
+						<span>密码</span>
+						<input id="register-password" name="register_password" type="password" autocomplete="new-password" minlength="8" required>
+					</label>
+					<label>
+						<span>确认密码</span>
+						<input id="register-password-confirm" name="register_password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
+					</label>
+				</div>
+				<button id="auth-submit" class="btn btn-primary" type="submit">登录</button>
 				<p id="login-error" class="form-error" role="alert"></p>
 			</form>
 		</section>
@@ -56,6 +76,18 @@
 		</section>
 
 		<section id="activities-view" hidden>
+			<div class="activities-feed-header">
+				<div>
+					<p class="activities-feed-eyebrow">COMMUNITY FEED</p>
+					<h1 class="activities-feed-title">发现动态</h1>
+					<p class="activities-feed-subtitle">看看大家正在分享的画面。</p>
+				</div>
+				<div class="activities-feed-tabs" role="tablist" aria-label="动态筛选">
+					<button class="activities-feed-tab is-active" type="button" role="tab" aria-selected="true" data-action="set-activity-filter" data-filter="all">全部</button>
+					<button class="activities-feed-tab" type="button" role="tab" aria-selected="false" data-action="set-activity-filter" data-filter="image">图片</button>
+					<button class="activities-feed-tab" type="button" role="tab" aria-selected="false" data-action="set-activity-filter" data-filter="video">视频</button>
+				</div>
+			</div>
 			<div id="activities-loading" class="activity-loading">正在加载动态...</div>
 			<div id="activities-feed" class="activities-feed"></div>
 			<button id="activities-load-more" class="activity-load-more" type="button" data-action="load-more-activities" hidden>加载更多动态</button>

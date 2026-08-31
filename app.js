@@ -28,6 +28,8 @@
 		activitiesNeedsRevalidate: false,
 		persistentCacheUserId: "",
 		currentActivity: null,
+		activityFilter: "all",
+		authMode: "login",
 	};
 
 	function $(id) {
@@ -207,6 +209,7 @@
 
 	function showLogin() {
 		clearSessionCaches();
+		setAuthMode("login");
 		showOnly("login-view");
 		renderProfile();
 	}
@@ -226,6 +229,7 @@
 		state.activityCommentBusy = false;
 		state.persistentCacheUserId = "";
 		state.currentActivity = null;
+		state.activityFilter = "all";
 	}
 
 	function setUserStatus() {
@@ -734,13 +738,39 @@
 		var avatarInitial = escapeHtml(String(displayName).charAt(0));
 		var title = activityText(activity, "title");
 		var body = activityText(activity, "body");
+		var commentCount = Math.max(0, Number(activity.comment_count || 0));
+		var mediaCount = Math.max(imageCount, 0);
 		return activityCoverMarkup(activity) +
 			'<div class="activity-card-content">' +
 				(title ? '<h2 class="activity-title">' + escapeHtml(title) + '</h2>' : "") +
 				(body ? '<p class="activity-body">' + escapeHtml(body).replace(/\n/g, "<br>") + '</p>' : "") +
+				'<div class="activity-card-meta"><span>' + mediaCount + ' 个媒体</span>' + (commentCount ? '<span>' + commentCount + ' 条评论</span>' : '') + '</div>' +
 				'<header class="activity-author"><span class="activity-avatar" aria-hidden="true">' + avatarInitial + '</span><strong>' + author + '</strong><time>' + escapeHtml(formatRelativeTime(activity.created_at)) + '</time></header>' +
 				(remaining ? '<button class="activity-more-images" type="button" data-action="load-activity-images" data-activity-id="' + escapeHtml(activity.id) + '">加载更多</button>' : '') +
 			'</div>';
+	}
+
+	function activityMatchesFilter(activity) {
+		if (state.activityFilter === "all") {
+			return true;
+		}
+		var images = Array.isArray(activity && activity.images) ? activity.images : [];
+		var hasVideo = !!(activityVideoUrl(activity, null) || images.some(function (image) {
+			return activityMedia(null, image).isVideo;
+		}));
+		return state.activityFilter === "video" ? hasVideo : !hasVideo;
+	}
+
+	function filteredActivities(activities) {
+		return (activities || []).filter(activityMatchesFilter);
+	}
+
+	function syncActivityFilterTabs() {
+		Array.prototype.forEach.call(document.querySelectorAll(".activities-feed-tab"), function (tab) {
+			var active = tab.dataset.filter === state.activityFilter;
+			tab.classList.toggle("is-active", active);
+			tab.setAttribute("aria-selected", active ? "true" : "false");
+		});
 	}
 
 	function renderActivities(activities) {
@@ -749,13 +779,17 @@
 		var loading = $("activities-loading");
 		if (!feed || !empty || !loading) return;
 		loading.hidden = true;
-		empty.hidden = activities.length !== 0;
+		var visibleActivities = filteredActivities(activities);
+		empty.hidden = visibleActivities.length !== 0;
+		empty.textContent = activities.length && !visibleActivities.length
+			? (state.activityFilter === "video" ? "还没有视频动态。" : "还没有图片动态。")
+			: "还没有动态。发布第一条，留下今天的画面。";
 		var existingCards = new Map();
 		Array.prototype.forEach.call(feed.querySelectorAll(".activity-card"), function (card) {
 			existingCards.set(String(card.dataset.activityId), card);
 		});
 		var fragment = document.createDocumentFragment();
-		activities.forEach(function (activity) {
+		visibleActivities.forEach(function (activity) {
 			var key = String(activity.id == null ? "" : activity.id);
 			var signature = activitySignature(activity);
 			var card = existingCards.get(key);
@@ -773,6 +807,13 @@
 		feed.replaceChildren(fragment);
 		$("activities-load-more").hidden = !state.activitiesHasMore;
 		$("activities-load-more").disabled = state.activitiesLoadingMore;
+		syncActivityFilterTabs();
+	}
+
+	function setActivityFilter(filter) {
+		var nextFilter = ["all", "image", "video"].indexOf(filter) >= 0 ? filter : "all";
+		state.activityFilter = nextFilter;
+		renderActivities(state.activities);
 	}
 
 	function loadActivities(page, options) {
@@ -1365,6 +1406,76 @@ function formatRelativeTime(value) {
 		}
 		return { replyTo: "", text: String(body || "") };
 	}
+
+	function setAuthMode(mode) {
+		state.authMode = mode === "register" ? "register" : "login";
+		var isRegister = state.authMode === "register";
+		var loginFields = $("auth-login-fields");
+		var registerFields = $("auth-register-fields");
+		var submit = $("auth-submit");
+		if (loginFields) {
+			loginFields.hidden = isRegister;
+			Array.prototype.forEach.call(loginFields.querySelectorAll("input"), function (input) {
+				input.required = !isRegister;
+			});
+		}
+		if (registerFields) {
+			registerFields.hidden = !isRegister;
+			Array.prototype.forEach.call(registerFields.querySelectorAll("input"), function (input) {
+				input.required = isRegister;
+			});
+		}
+		Array.prototype.forEach.call(document.querySelectorAll(".auth-tab"), function (tab) {
+			var active = tab.dataset.mode === state.authMode;
+			tab.classList.toggle("is-active", active);
+			tab.setAttribute("aria-selected", active ? "true" : "false");
+		});
+		$("auth-title").textContent = isRegister ? "注册社区账号" : "登录社区";
+		$("auth-subtitle").textContent = isRegister ? "注册后即可发布动态、评论互动。" : "请输入账号后查看大家的动态。";
+		if (submit) {
+			submit.textContent = isRegister ? "注册" : "登录";
+		}
+		$("login-error").textContent = "";
+	}
+
+	function submitRegister() {
+		var username = $("register-username").value.trim();
+		var password = $("register-password").value;
+		var confirm = $("register-password-confirm").value;
+		if (!username || !password || !confirm) {
+			$("login-error").textContent = "请填写用户名和密码。";
+			return;
+		}
+		if (password !== confirm) {
+			$("login-error").textContent = "两次输入的密码不一致。";
+			return;
+		}
+		primeSession().then(function () {
+			return api("Auth::register", {
+				method: "POST",
+				body: {
+					username: username,
+					password: password,
+					password_confirmation: confirm
+				}
+			});
+		}).then(function () {
+			return api("Auth::user");
+		}).then(function (payload) {
+			state.user = resource(payload);
+			if (!isLoggedIn(state.user)) {
+				throw new Error("注册失败");
+			}
+			$("register-password").value = "";
+			$("register-password-confirm").value = "";
+			restoreAndRevalidateUserCache();
+			loadActivities();
+			recordSiteEntryInBackground();
+		}).catch(function (error) {
+			$("login-error").textContent = error.message;
+		});
+	}
+
 	function bindEvents() {
 		document.body.addEventListener("pointerdown", function (event) {
 			var target = event.target.closest(".btn, .bottom-fab");
@@ -1397,12 +1508,16 @@ function formatRelativeTime(value) {
 			var action = target.dataset.action;
 			if (action === "context-add") {
 				handleContextAdd();
+			} else if (action === "set-auth-mode") {
+				setAuthMode(target.dataset.mode);
 			} else if (action === "home") {
 				loadActivities();
 			} else if (action === "open-profile") {
 				loadProfile();
 			} else if (action === "open-activities") {
 				loadActivities();
+			} else if (action === "set-activity-filter") {
+				setActivityFilter(target.dataset.filter);
 			} else if (action === "open-activity-composer") {
 				openActivityComposer();
 			} else if (action === "close-compose") {
@@ -1435,6 +1550,10 @@ function formatRelativeTime(value) {
 		$("login-form").addEventListener("submit", function (event) {
 			event.preventDefault();
 			$("login-error").textContent = "";
+			if (state.authMode === "register") {
+				submitRegister();
+				return;
+			}
 			primeSession().then(function () {
 				return api("Auth::login", {
 				method: "POST",

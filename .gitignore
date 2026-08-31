@@ -1,6 +1,8 @@
 .env
 .env.*
 *.log
-Pictures/
-*.tar.gz
-*.tgz
+storage/
+vendor/
+node_modules/
+.DS_Store
+Thumbs.db

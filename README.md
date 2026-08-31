@@ -5,6 +5,7 @@
 ## 功能
 
 - 登录与会话恢复（CSRF + 同源 Cookie）
+- 开放自助注册（用户名 3~40 字，密码 ≥8 位，注册后自动登录）
 - 动态流 + 无限滚动（每页 15 条，加密游标/分页）
 - 发布动态：标题 ≤120 字、正文 ≤5000 字、最多 20 个媒体文件（JPG/PNG/WebP/GIF/HEIC/HEIF + MP4/MOV/WebM）
 - 动态详情：图片轮播、视频播放、评论与回复（≤500 字）
@@ -22,6 +23,7 @@
 | `styles.css` | 毛玻璃风格样式表，响应式 + 暗色模式 |
 | `admin/` | `/gallery/myadmin` 管理员中心 |
 | `AccountLoginController.php` | 进入记录 API |
+| `AuthRegisterController.php` | 开放注册 API |
 | `ActivityController.php` | 动态 / 评论 API |
 | `LoginSecurityController.php` / `LoginSecurityMiddleware.php` | 设备信任与登录封禁 |
 | `OperationAuditController.php` / `OperationAuditMiddleware.php` | 操作审计 |
@@ -64,6 +66,13 @@ docker restart <container>
 - 登录安全：同设备连续 5 次密码错误封禁 5 天；管理员可开启「仅允许已信任的电脑登录」
 - 操作审计：记录 API 写操作，不含密码、令牌与内容正文
 
+## 关于 `xhs_work` 的复用边界
+
+`xhs_work` 中的 `xhs-pc-web` 是从小红书公开 CDN 下载的生产构建产物，不是带开源许可证的源码仓库；APK、native 库、签名算法、账号密钥协商和小红书接口也属于受保护的闭源实现。
+
+本项目可以借鉴其公开可观察的产品模式，例如内容流分栏、媒体预览、渐进加载和移动端导航，但应使用本项目自己的 HTML/CSS/JavaScript、接口和媒体资源重新实现。不要直接复制 `xhs-pc-web` 的 JS/CSS、图标、文案、品牌元素、CDN 地址、接口签名或账号数据，也不要把 `xhs_work` 目录部署到站点。
+
+在取得小红书或相关权利人的书面授权、并确认授权覆盖再分发和商业使用之前，不应将逆向产物直接合并到生产项目。当前社区版新增的动态类型筛选是独立实现，只调用现有 `/api/v2/Activities` 接口。
 
 ## 本地开发
 
@@ -73,7 +82,8 @@ docker restart <container>
 
 1. 登录 → 默认进入动态流，底部导航只有「首页 / 发布 / 我的」
 2. 动态流能看到所有用户发布的动态
-3. 发布带图片/视频的动态 → 上传成功并出现在流顶部
+3. 注册新账号 → 自动登录 → 可发布带图片/视频的动态，出现在流顶部
 4. 打开动态详情 → 评论、回复正常
 5. 「我的」页面无统计区，退出登录正常
 6. 全站无任何相册/共享码入口；直接访问旧接口（如 `/api/v2/AlbumInviteCodes`）应返回 404/405
+7. 根路径 `/` 与 `/custom-gallery/` 均显示纯动态流，无相册入口
