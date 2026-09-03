@@ -29,6 +29,8 @@ class LoginSecurityController extends Controller
 			->map(static fn ($trustedDevice) => [
 				'id' => (int) $trustedDevice->id,
 				'is_desktop' => (bool) $trustedDevice->is_desktop,
+				'is_trusted_desktop' => true,
+				'is_trusted_device' => true,
 				'first_seen_at' => $trustedDevice->first_seen_at,
 				'last_seen_at' => $trustedDevice->last_seen_at,
 				'ip_address' => $trustedDevice->ip_address,
@@ -38,10 +40,12 @@ class LoginSecurityController extends Controller
 
 		return response()->json([
 			'desktop_protection_enabled' => (bool) $settings->desktop_protection_enabled,
+			'trusted_device_only_enabled' => (bool) $settings->desktop_protection_enabled,
 			'current_device' => [
 				'id' => (int) $device->id,
 				'is_desktop' => (bool) $device->is_desktop,
 				'is_trusted_desktop' => $device->trusted_at !== null,
+				'is_trusted_device' => $device->trusted_at !== null,
 				'trusted_at' => $device->trusted_at,
 			],
 			'devices' => $devices,
@@ -52,10 +56,6 @@ class LoginSecurityController extends Controller
 	{
 		$user = $this->requireAdministrator();
 		[$device, $newToken] = $this->resolveCurrentDevice($request);
-		if (!(bool) $device->is_desktop) {
-			abort(422, 'Only desktop devices can be trusted for desktop login protection.');
-		}
-
 		DB::table('gallery_login_devices')->where('id', $device->id)->update([
 			'trusted_at' => now(),
 			'trusted_by' => $user->id,
@@ -70,8 +70,8 @@ class LoginSecurityController extends Controller
 	{
 		$this->requireAdministrator();
 		$enabled = $this->parseBoolean($request->input('enabled'));
-		if ($enabled && !$this->hasTrustedDesktop()) {
-			abort(422, 'Trust at least one desktop device before enabling desktop login protection.');
+		if ($enabled && !$this->hasTrustedDevice()) {
+			abort(422, '开启可信设备限制前，请先信任至少一台设备。');
 		}
 
 		DB::table('gallery_login_security_settings')->updateOrInsert(
@@ -79,7 +79,7 @@ class LoginSecurityController extends Controller
 			['desktop_protection_enabled' => $enabled, 'updated_at' => now(), 'created_at' => now()]
 		);
 
-		return response()->json(['ok' => true, 'desktop_protection_enabled' => $enabled]);
+		return response()->json(['ok' => true, 'desktop_protection_enabled' => $enabled, 'trusted_device_only_enabled' => $enabled]);
 	}
 
 	public function revokeDevice(Request $request, int $id): JsonResponse
@@ -92,14 +92,13 @@ class LoginSecurityController extends Controller
 				abort(404, 'Trusted device not found.');
 			}
 
-			if ((bool) ($settings->desktop_protection_enabled ?? false) && (bool) $device->is_desktop) {
-				$trustedDesktops = DB::table('gallery_login_devices')
+			if ((bool) ($settings->desktop_protection_enabled ?? false)) {
+				$trustedDevices = DB::table('gallery_login_devices')
 					->whereNotNull('trusted_at')
-					->where('is_desktop', true)
 					->lockForUpdate()
 					->count();
-				if ($trustedDesktops <= 1) {
-					abort(422, 'Cannot revoke the final trusted desktop while desktop login protection is enabled.');
+				if ($trustedDevices <= 1) {
+					abort(422, '可信设备限制开启时不能撤销最后一台可信设备。');
 				}
 			}
 
@@ -179,11 +178,10 @@ class LoginSecurityController extends Controller
 		return DB::table('gallery_login_security_settings')->where('id', 1)->first();
 	}
 
-	private function hasTrustedDesktop(): bool
+	private function hasTrustedDevice(): bool
 	{
 		return DB::table('gallery_login_devices')
 			->whereNotNull('trusted_at')
-			->where('is_desktop', true)
 			->exists();
 	}
 

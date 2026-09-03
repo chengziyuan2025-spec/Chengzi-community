@@ -15,7 +15,7 @@ class OptimizeActivityMedia implements ShouldQueue
 	use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
 	public int $tries = 3;
-	public int $timeout = 300;
+	public int $timeout = 900;
 
 	public function __construct(public readonly int $imageId)
 	{
@@ -29,15 +29,20 @@ class OptimizeActivityMedia implements ShouldQueue
 		}
 		$source = public_path($image->path);
 		if (!is_file($source)) {
+			GalleryActivityImage::whereKey($this->imageId)->update(['processing_status' => 'failed', 'updated_at' => now()]);
 			return;
 		}
 		if (str_starts_with((string) $image->mime_type, 'video/')) {
 			$this->transcodeVideo($image, $source);
 			return;
 		}
-		if (!class_exists(\Imagick::class) || str_starts_with((string) $image->mime_type, 'image/gif')) return;
+		if (!class_exists(\Imagick::class) || str_starts_with((string) $image->mime_type, 'image/gif')) {
+			GalleryActivityImage::whereKey($this->imageId)->update(['processing_status' => 'ready', 'updated_at' => now()]);
+			return;
+		}
 
-		$targetDir = public_path('custom-gallery/activity-display/' . now()->format('Y/m'));
+		$relativeDir = 'custom-gallery/activity-display/' . now()->format('Y/m');
+		$targetDir = public_path($relativeDir);
 		if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
 			throw new \RuntimeException('Cannot create optimized media directory.');
 		}
@@ -56,10 +61,7 @@ class OptimizeActivityMedia implements ShouldQueue
 			$media->setImageFormat('webp');
 			$media->setImageCompressionQuality(80);
 			$media->writeImage($target);
-			$image->forceFill([
-				'display_path' => 'custom-gallery/activity-display/' . now()->format('Y/m') . '/' . basename($target),
-				'processing_status' => 'ready',
-			])->save();
+			$this->commitOutput($target, $relativeDir . '/' . basename($target));
 		} finally {
 			$media->clear();
 			$media->destroy();
@@ -68,7 +70,8 @@ class OptimizeActivityMedia implements ShouldQueue
 
 	private function transcodeVideo(GalleryActivityImage $image, string $source): void
 	{
-		$targetDir = public_path('custom-gallery/activity-display/' . now()->format('Y/m'));
+		$relativeDir = 'custom-gallery/activity-display/' . now()->format('Y/m');
+		$targetDir = public_path($relativeDir);
 		if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) throw new \RuntimeException('Cannot create optimized media directory.');
 		$target = $targetDir . '/' . pathinfo((string) $image->path, PATHINFO_FILENAME) . '.mp4';
 		$temp = $target . '.' . bin2hex(random_bytes(6)) . '.tmp.mp4';
@@ -77,9 +80,22 @@ class OptimizeActivityMedia implements ShouldQueue
 			$process->setTimeout(900);
 			$process->mustRun();
 			if (!rename($temp, $target)) throw new \RuntimeException('Cannot store optimized video.');
-			$image->forceFill(['display_path' => 'custom-gallery/activity-display/' . now()->format('Y/m') . '/' . basename($target), 'processing_status' => 'ready'])->save();
+			$this->commitOutput($target, $relativeDir . '/' . basename($target));
 		} finally {
 			@unlink($temp);
+		}
+	}
+
+	private function commitOutput(string $target, string $displayPath): void
+	{
+		$updated = GalleryActivityImage::whereKey($this->imageId)
+			->whereNull('display_path')
+			->update(['display_path' => $displayPath, 'processing_status' => 'ready', 'updated_at' => now()]);
+		if ($updated !== 1) {
+			$currentPath = GalleryActivityImage::whereKey($this->imageId)->value('display_path');
+			if ((string) $currentPath !== $displayPath) {
+				@unlink($target);
+			}
 		}
 	}
 

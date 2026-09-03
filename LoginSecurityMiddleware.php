@@ -7,14 +7,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 class LoginSecurityMiddleware
 {
 	public const DEVICE_COOKIE = 'gallery_device_token';
 	private const COOKIE_MINUTES = 525600;
-	private const MAX_FAILED_ATTEMPTS = 5;
-	private const BAN_DAYS = 5;
+	private const ACCOUNT_MAX_ATTEMPTS = 5;
+	private const IP_MAX_ATTEMPTS = 30;
+	private const DECAY_SECONDS = 900;
 
 	public function handle(Request $request, Closure $next): Response
 	{
@@ -24,24 +26,26 @@ class LoginSecurityMiddleware
 
 		[$device, $newToken] = $this->resolveDevice($request);
 		$this->queueDeviceCookie($newToken);
-		$now = now();
-
-		if ($device->banned_until !== null && Carbon::parse($device->banned_until)->isAfter($now)) {
+		[$accountKey, $ipKey] = $this->rateLimitKeys($request);
+		if (RateLimiter::tooManyAttempts($accountKey, self::ACCOUNT_MAX_ATTEMPTS)
+			|| RateLimiter::tooManyAttempts($ipKey, self::IP_MAX_ATTEMPTS)) {
 			return response()->json([
-				'message' => 'This device is temporarily blocked after too many failed password attempts.',
+				'message' => '登录尝试过于频繁，请在 15 分钟后重试。',
 			], 429);
 		}
 
-		if ($this->desktopProtectionEnabled() && (bool) $device->is_desktop && $device->trusted_at === null) {
+		if ($this->trustedDeviceOnlyEnabled() && $device->trusted_at === null) {
 			return response()->json([
-				'message' => 'Desktop login is restricted to trusted devices.',
+				'message' => '此设备尚未被管理员加入可信设备。',
 			], 403);
 		}
 
 		$response = $next($request);
 		if ($response->getStatusCode() === 401) {
-			$this->recordFailedAttempt((string) $device->token_hash);
+			RateLimiter::hit($accountKey, self::DECAY_SECONDS);
+			RateLimiter::hit($ipKey, self::DECAY_SECONDS);
 		} elseif ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+			RateLimiter::clear($accountKey);
 			DB::table('gallery_login_devices')
 				->where('token_hash', $device->token_hash)
 				->update([
@@ -108,36 +112,23 @@ class LoginSecurityMiddleware
 		return [(object) array_merge((array) $device, $updates), $newToken];
 	}
 
-	private function recordFailedAttempt(string $tokenHash): void
-	{
-		DB::transaction(function () use ($tokenHash): void {
-			$device = DB::table('gallery_login_devices')
-				->where('token_hash', $tokenHash)
-				->lockForUpdate()
-				->first();
-			if ($device === null) {
-				return;
-			}
-
-			$attempts = (int) $device->failed_attempts + 1;
-			$updates = [
-				'failed_attempts' => $attempts,
-				'last_seen_at' => now(),
-				'updated_at' => now(),
-			];
-			if ($attempts >= self::MAX_FAILED_ATTEMPTS) {
-				$updates['banned_until'] = now()->addDays(self::BAN_DAYS);
-			}
-
-			DB::table('gallery_login_devices')->where('id', $device->id)->update($updates);
-		});
-	}
-
-	private function desktopProtectionEnabled(): bool
+	private function trustedDeviceOnlyEnabled(): bool
 	{
 		return (bool) DB::table('gallery_login_security_settings')
 			->where('id', 1)
 			->value('desktop_protection_enabled');
+	}
+
+	/** @return array{0:string,1:string} */
+	private function rateLimitKeys(Request $request): array
+	{
+		$ip = strtolower(trim((string) $request->ip()));
+		$username = mb_strtolower(trim((string) $request->input('username', '')));
+
+		return [
+			'gallery-login-account:' . hash('sha256', $ip . '|' . $username),
+			'gallery-login-ip:' . hash('sha256', $ip),
+		];
 	}
 
 	private function queueDeviceCookie(?string $token): void

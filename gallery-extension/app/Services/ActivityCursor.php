@@ -2,7 +2,6 @@
 
 namespace App\GalleryExtension\Services;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 
 class ActivityCursor
@@ -15,8 +14,12 @@ class ActivityCursor
 		}
 		try {
 			$value = json_decode(Crypt::decryptString($cursor), true, 512, JSON_THROW_ON_ERROR);
-			if (!is_array($value) || !isset($value['activity_id'], $value['position'], $value['id'])) {
-				return null;
+			if (!is_array($value)
+				|| !isset($value['activity_id'], $value['position'], $value['id'], $value['expires_at'])
+				|| (int) $value['activity_id'] < 1
+				|| (int) $value['id'] < 1
+				|| (int) $value['expires_at'] < time()) {
+				abort(422, 'Invalid or expired cursor.');
 			}
 			return ['activity_id' => (int) $value['activity_id'], 'position' => (int) $value['position'], 'id' => (int) $value['id']];
 		} catch (\Throwable) {
@@ -30,6 +33,7 @@ class ActivityCursor
 			'activity_id' => (int) $image->activity_id,
 			'position' => (int) $image->position,
 			'id' => (int) $image->id,
+			'expires_at' => time() + 3600,
 		], JSON_THROW_ON_ERROR));
 	}
 }

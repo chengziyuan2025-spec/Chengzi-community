@@ -99,10 +99,15 @@ require_file "$SRC_DIR/LoginSecurityMiddleware.php"
 require_file "$SRC_DIR/PerformanceTimingMiddleware.php"
 require_file "$SRC_DIR/OperationAuditController.php"
 require_file "$SRC_DIR/OperationAuditMiddleware.php"
+require_file "$SRC_DIR/RegistrationController.php"
 require_file "$GALLERY_EXTENSION_SRC/routes/gallery.php"
 require_file "$GALLERY_EXTENSION_SRC/app/Support/ApiResponse.php"
+require_file "$GALLERY_EXTENSION_SRC/app/Services/ActivityFeedCursor.php"
 require_file "$GALLERY_EXTENSION_SRC/app/Http/Middleware/GalleryApiMiddleware.php"
+require_file "$GALLERY_EXTENSION_SRC/app/Console/Commands/GalleryPromoteAdministratorCommand.php"
 require_file "$GALLERY_EXTENSION_SRC/database/migrations/2026_08_20_000000_create_gallery_extension_tables.php"
+require_file "$GALLERY_EXTENSION_SRC/database/migrations/2026_09_03_000000_create_gallery_registration_tables.php"
+require_file "$GALLERY_EXTENSION_SRC/database/migrations/2026_09_03_000001_add_registration_bootstrap_state.php"
 require_file "$ADMIN_SRC_DIR/index.html"
 require_file "$ADMIN_SRC_DIR/admin.css"
 require_file "$ADMIN_SRC_DIR/admin.js"
@@ -160,8 +165,10 @@ backup_and_copy "$SRC_DIR/LoginSecurityMiddleware.php" "$APP_DIR/app/Http/Middle
 backup_and_copy "$SRC_DIR/PerformanceTimingMiddleware.php" "$APP_DIR/app/Http/Middleware/PerformanceTimingMiddleware.php"
 backup_and_copy "$SRC_DIR/OperationAuditController.php" "$APP_DIR/app/Http/Controllers/Gallery/OperationAuditController.php"
 backup_and_copy "$SRC_DIR/OperationAuditMiddleware.php" "$APP_DIR/app/Http/Middleware/OperationAuditMiddleware.php"
+backup_and_copy "$SRC_DIR/RegistrationController.php" "$APP_DIR/app/Http/Controllers/Gallery/RegistrationController.php"
 cp -R "$GALLERY_EXTENSION_SRC/app/Support" "$APP_DIR/app/GalleryExtension/"
 cp -R "$GALLERY_EXTENSION_SRC/app/Services" "$APP_DIR/app/GalleryExtension/"
+rm -f "$APP_DIR/app/GalleryExtension/Services/GalleryCache.php"
 cp -R "$GALLERY_EXTENSION_SRC/app/Http/Requests/." "$APP_DIR/app/Http/Requests/"
 cp -R "$GALLERY_EXTENSION_SRC/app/Http/Resources/." "$APP_DIR/app/Http/Resources/"
 cp -R "$GALLERY_EXTENSION_SRC/app/Http/Middleware/." "$APP_DIR/app/Http/Middleware/"
@@ -208,8 +215,8 @@ ensure_ini_value "$PHP_LOCAL_INI" "upload_max_filesize" "0"
 ensure_ini_value "$PHP_LOCAL_INI" "post_max_size" "0"
 ensure_ini_value "$PHP_LOCAL_INI" "max_file_uploads" "100000"
 ensure_ini_value "$PHP_LOCAL_INI" "max_multipart_body_parts" "120000"
-ensure_ini_value "$PHP_LOCAL_INI" "max_execution_time" "300"
-ensure_ini_value "$PHP_LOCAL_INI" "max_input_time" "300"
+ensure_ini_value "$PHP_LOCAL_INI" "max_execution_time" "900"
+ensure_ini_value "$PHP_LOCAL_INI" "max_input_time" "900"
 ensure_ini_value "$PHP_LOCAL_INI" "memory_limit" "768M"
 ensure_ini_value "$PHP_LOCAL_INI" "session.cookie_secure" "1"
 ensure_ini_value "$PHP_LOCAL_INI" "session.cookie_httponly" "1"
@@ -322,7 +329,7 @@ ROUTES_FILE="$APP_DIR/routes/api_v2.php" GALLERY_ROUTE_FILE="$GALLERY_ROUTE_DIR/
 <?php
 $file = getenv('ROUTES_FILE');
 $contents = file_get_contents($file);
-$controllers = '(?:AlbumInviteController|AlbumPhotoFeedController|AccountLoginController|ActivityController|MotionPhotoController|LoginSecurityController|OperationAuditController)';
+$controllers = '(?:AlbumInviteController|AlbumPhotoFeedController|AccountLoginController|ActivityController|MotionPhotoController|LoginSecurityController|OperationAuditController|RegistrationController)';
 $contents = preg_replace('/^Route::(?:get|post|delete)\([^\n]*\[Gallery\\\\' . $controllers . '::class,[^\n]*\n/m', '', $contents) ?? $contents;
 $require = "require_once __DIR__ . '/gallery.php';";
 if (!str_contains($contents, $require)) {

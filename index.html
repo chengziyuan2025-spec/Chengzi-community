@@ -20,7 +20,7 @@
 
 		<section id="login-view" class="login-shell" hidden>
 			<form id="login-form" class="login-panel">
-				<div class="auth-tabs" role="tablist" aria-label="登录或注册">
+				<div id="auth-tabs" class="auth-tabs" role="tablist" aria-label="登录或注册">
 					<button class="auth-tab is-active" type="button" role="tab" aria-selected="true" data-action="set-auth-mode" data-mode="login">登录</button>
 					<button class="auth-tab" type="button" role="tab" aria-selected="false" data-action="set-auth-mode" data-mode="register">注册</button>
 				</div>
@@ -43,11 +43,18 @@
 				<div id="auth-register-fields" hidden>
 					<label>
 						<span>用户名</span>
-						<input id="register-username" name="register_username" autocomplete="username" maxlength="40" required>
+						<input id="register-username" name="register_username" autocomplete="username" minlength="3" maxlength="40" pattern="[A-Za-z0-9_\-\u4e00-\u9fff]+" required>
+						<small>3～40 个字符，可使用中文、字母、数字、下划线和短横线。</small>
 					</label>
 					<label>
 						<span>密码</span>
 						<input id="register-password" name="register_password" type="password" autocomplete="new-password" minlength="8" required>
+						<small>至少 8 个字符，请使用仅自己知道的密码。</small>
+					</label>
+					<label id="register-invite-field" hidden>
+						<span>邀请码</span>
+						<input id="register-invite-code" name="invite_code" autocomplete="one-time-code" maxlength="64" placeholder="XXXX-XXXX-XXXX">
+						<small>邀请码仅可成功注册一次。</small>
 					</label>
 					<label>
 						<span>确认密码</span>
@@ -71,13 +78,18 @@
 						<span id="profile-username"></span>
 					</div>
 				</section>
-				<button class="btn btn-danger profile-logout" type="button" data-action="logout">退出登录</button>
+				<div class="profile-actions">
+					<button class="btn" type="button" data-action="open-my-activities">我的动态</button>
+					<a id="profile-admin-link" class="btn" href="/gallery/myadmin/" hidden>管理员中心</a>
+					<button class="btn btn-danger profile-logout" type="button" data-action="logout">退出登录</button>
+				</div>
 			</div>
 		</section>
 
 		<section id="activities-view" hidden>
 			<div class="activities-feed-header">
 				<div>
+					<button id="activities-scope-back" class="back-link" type="button" data-action="close-my-activities" aria-label="返回个人中心" hidden><span aria-hidden="true">&larr;</span></button>
 					<p class="activities-feed-eyebrow">COMMUNITY FEED</p>
 					<h1 class="activities-feed-title">发现动态</h1>
 					<p class="activities-feed-subtitle">看看大家正在分享的画面。</p>
@@ -109,7 +121,9 @@
 						<label><span>正文</span><textarea id="activity-body" name="body" maxlength="5000" rows="3" placeholder="写点什么"></textarea></label>
 						<input id="activity-images" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,video/mp4,video/quicktime,video/webm" multiple hidden>
 						<div id="activity-image-preview" class="activity-image-preview"></div>
-						<div class="activity-form-actions"><button class="btn" type="button" data-action="pick-activity-images">添加照片</button><span id="activity-image-count" class="card-meta" aria-live="polite"></span><button id="activity-submit" class="btn btn-primary" type="submit">发布</button></div>
+						<p class="compose-media-help">最多 20 个文件；图片不超过 25MB，视频不超过 250MB，总大小不超过 500MB。</p>
+						<div id="activity-upload-progress" class="activity-upload-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="activity-upload-progress-bar"></span></div>
+						<div class="activity-form-actions"><button class="btn" type="button" data-action="pick-activity-images">添加图片/视频</button><span id="activity-image-count" class="card-meta" aria-live="polite"></span><button id="activity-upload-cancel" class="btn" type="button" data-action="cancel-activity-upload" hidden>取消上传</button><button id="activity-submit" class="btn btn-primary" type="submit">发布</button></div>
 					</form>
 				</section>
 			</div>
@@ -143,7 +157,7 @@
 				<div class="activity-detail-author"><span id="activity-detail-avatar" class="activity-avatar" aria-hidden="true"></span><div><strong id="activity-detail-author-name"></strong><time id="activity-detail-time"></time></div></div>
 				<h2 id="activity-detail-title" class="activity-detail-title"></h2>
 				<p id="activity-detail-body" class="activity-detail-body"></p>
-				<div id="activity-detail-thumbs" class="activity-detail-thumbs" aria-label="动态图片"></div>
+				<div id="activity-detail-thumbs" class="activity-detail-thumbs" aria-label="动态媒体"></div>
 				<section class="activity-detail-comments" aria-label="动态评论">
 					<div class="activity-comments-header"><strong>评论</strong><span id="activity-comment-count"></span></div>
 					<div id="activity-comment-list" class="activity-comment-list"></div>
@@ -155,6 +169,14 @@
 				</section>
 			</div>
 		</article>
+	</div>
+
+	<div id="activity-delete-dialog" class="activity-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-delete-title" aria-hidden="true" hidden>
+		<div class="activity-delete-panel">
+			<h2 id="activity-delete-title">删除这条动态？</h2>
+			<p>动态、评论和全部媒体将被彻底删除，无法恢复。</p>
+			<div class="activity-delete-actions"><button class="btn" type="button" data-action="cancel-delete-activity">取消</button><button id="activity-delete-confirm" class="btn btn-danger" type="button" data-action="confirm-delete-activity">彻底删除</button></div>
+		</div>
 	</div>
 
 	<div class="toast" id="toast" hidden></div>

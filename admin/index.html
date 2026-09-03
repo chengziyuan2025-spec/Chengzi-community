@@ -16,7 +16,7 @@
 		<section id="admin-login" class="auth-panel" hidden aria-labelledby="login-title">
 			<p class="section-label">管理员中心</p>
 			<h1 id="login-title">登录后继续</h1>
-			<p class="section-copy">请使用你的相册账号登录。</p>
+			<p class="section-copy">请使用你的社区账号登录。</p>
 			<form id="admin-login-form">
 				<label><span>用户名</span><input id="admin-username" name="username" autocomplete="username" required></label>
 				<label><span>密码</span><input id="admin-password" name="password" type="password" autocomplete="current-password" required></label>
@@ -28,13 +28,13 @@
 		<section id="admin-denied" class="notice-panel" hidden aria-labelledby="denied-title">
 			<p class="section-label">访问受限</p>
 			<h1 id="denied-title">此账号没有管理员权限</h1>
-			<p class="section-copy">进入记录仅对相册管理员开放。</p>
-			<div class="action-row"><a class="button" href="/gallery">返回相册</a><button id="admin-denied-logout" class="button button-primary" type="button">退出登录</button></div>
+			<p class="section-copy">进入记录仅对社区管理员开放。</p>
+			<div class="action-row"><a class="button" href="/gallery">返回社区</a><button id="admin-denied-logout" class="button button-primary" type="button">退出登录</button></div>
 		</section>
 		<section id="admin-dashboard" hidden aria-labelledby="events-title">
 			<div class="page-heading">
-				<div><p class="section-label">管理员中心</p><h1 id="events-title">进入记录</h1><p class="section-copy">最近 80 次相册账号进入记录。</p></div>
-				<div class="action-row"><a class="button" href="/gallery">返回相册</a><button id="admin-refresh" class="button" type="button">刷新</button><button id="admin-logout" class="button button-primary" type="button">退出登录</button></div>
+				<div><p class="section-label">管理员中心</p><h1 id="events-title">进入记录</h1><p class="section-copy">最近 80 次社区账号进入记录。</p></div>
+				<div class="action-row"><a class="button" href="/gallery">返回社区</a><button id="admin-refresh" class="button" type="button">刷新</button><button id="admin-logout" class="button button-primary" type="button">退出登录</button></div>
 			</div>
 			<p id="admin-status" class="status-message" role="status" aria-live="polite"></p>
 			<section class="security-panel" aria-labelledby="security-title">
@@ -46,14 +46,27 @@
 					<div><h3>当前设备</h3><p id="security-current-device" class="security-copy">正在读取设备状态...</p></div>
 					<button id="security-trust-current" class="button button-primary" type="button" disabled>信任当前设备</button>
 				</div>
-				<label class="security-toggle"><input id="security-desktop-protection" type="checkbox" disabled><span><strong>仅允许已信任的电脑登录</strong><small>开启后，未信任的电脑将在登录前被拒绝。</small></span></label>
+				<label class="security-toggle"><input id="security-trusted-device-only" type="checkbox" disabled><span><strong>仅允许已信任的设备登录</strong><small>开启后，未信任的电脑和移动设备都会在登录前被拒绝。</small></span></label>
 				<p id="security-status" class="security-status" role="status" aria-live="polite"></p>
 				<div class="trusted-devices-heading"><h3>已信任的设备</h3><span id="security-device-count" class="device-count"></span></div>
 				<div id="security-trusted-devices" class="trusted-device-list" aria-live="polite"></div>
 			</section>
+			<section class="registration-panel" aria-labelledby="registration-title">
+				<div class="panel-heading">
+					<div><p class="section-label">注册控制</p><h2 id="registration-title">注册模式与邀请码</h2><p class="panel-copy">邀请码默认 7 天有效、仅可使用一次，明文只在生成时展示。</p></div>
+					<button id="registration-refresh" class="button" type="button">刷新</button>
+				</div>
+				<div class="registration-controls">
+					<label for="registration-mode"><span>注册模式</span><select id="registration-mode" disabled><option value="invite">邀请注册</option><option value="open">开放注册</option></select></label>
+					<button id="registration-create-invite" class="button button-primary" type="button" disabled>生成邀请码</button>
+				</div>
+				<p id="registration-status" class="status-message" role="status" aria-live="polite"></p>
+				<div id="registration-new-code" class="registration-new-code" hidden><div><small>请立即保存，本页刷新后不再显示</small><strong id="registration-code-value"></strong></div><button id="registration-copy-code" class="button" type="button">复制</button></div>
+				<div id="registration-invites" class="registration-invite-list" aria-live="polite"></div>
+			</section>
 			<section class="audit-panel" aria-labelledby="audit-title">
 				<div class="panel-heading">
-					<div><p class="section-label">操作审计</p><h2 id="audit-title">操作日志</h2><p class="panel-copy">记录相册 API 写入操作的结果，不包含密码、令牌和内容正文。</p></div>
+					<div><p class="section-label">操作审计</p><h2 id="audit-title">操作日志</h2><p class="panel-copy">记录社区 API 写入操作的结果，不包含密码、令牌和内容正文。</p></div>
 					<button id="audit-refresh" class="button" type="button">刷新日志</button>
 				</div>
 				<form id="audit-filters" class="audit-filters">

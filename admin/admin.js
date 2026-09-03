@@ -7,6 +7,8 @@
 		loading: false,
 		securityLoading: false,
 		security: null,
+		registrationLoading: false,
+		registration: { mode: "invite", invites: [] },
 		auditLoading: false,
 		audit: { page: 1, perPage: 50, total: 0, lastPage: 1 }
 	};
@@ -29,6 +31,15 @@
 	}
 
 	function resource(payload) { return payload && payload.data !== undefined ? payload.data : payload; }
+	function apiErrorMessage(payload, fallback) {
+		var source = payload && payload.error ? payload.error : payload;
+		var details = source && (source.errors || source.details);
+		if (details && typeof details === "object") {
+			var key = Object.keys(details)[0];
+			if (key) { return Array.isArray(details[key]) ? String(details[key][0]) : String(details[key]); }
+		}
+		return source && source.message ? String(source.message) : (typeof source === "string" ? source : fallback);
+	}
 
 	function parseJson(response) {
 		return response.text().then(function (text) { return text ? JSON.parse(text) : null; });
@@ -40,7 +51,7 @@
 		return fetch(API + path, opts).then(function (response) {
 			return parseJson(response).catch(function () { return null; }).then(function (payload) {
 				if (!response.ok) {
-					var error = new Error(payload && (payload.message || (payload.error && payload.error.message) || payload.error) || ("请求失败：" + response.status));
+					var error = new Error(apiErrorMessage(payload, "请求失败：" + response.status));
 					error.status = response.status;
 					throw error;
 				}
@@ -58,7 +69,7 @@
 	}
 
 	function isAdministrator(user) {
-		return Boolean(user && (user.may_administrate === true || user.may_administrate === 1));
+		return Boolean(user && (user.may_administrate === true || user.may_administrate === 1 || user.may_administrate === "1"));
 	}
 
 	function setVisible(id) {
@@ -92,6 +103,12 @@
 		target.classList.toggle("is-error", Boolean(isError));
 	}
 
+	function setRegistrationStatus(message, isError) {
+		var target = $("registration-status");
+		target.textContent = message || "";
+		target.classList.toggle("is-error", Boolean(isError));
+	}
+
 	function showLogin(message) {
 		state.user = null;
 		setUser(null);
@@ -114,7 +131,7 @@
 	function securitySnapshot(payload) {
 		var data = resource(payload) || {};
 		return {
-			desktopProtectionEnabled: isTrue(data.desktop_protection_enabled),
+			trustedDeviceOnlyEnabled: isTrue(data.trusted_device_only_enabled !== undefined ? data.trusted_device_only_enabled : data.desktop_protection_enabled),
 			currentDevice: data.current_device || {},
 			devices: Array.isArray(data.devices) ? data.devices : []
 		};
@@ -130,19 +147,18 @@
 
 	function currentDeviceMessage(device) {
 		if (!device || !device.id) { return "未能识别当前设备，刷新页面后再试。"; }
-		if (!isTrue(device.is_desktop)) { return "当前设备不是电脑，不能用于电脑登录限制。"; }
-		return isTrue(device.is_trusted_desktop) ? "当前电脑已受信任，可以在限制开启后登录。" : "当前电脑尚未受信任。";
+		return isTrue(device.is_trusted_device !== undefined ? device.is_trusted_device : device.is_trusted_desktop) ? "当前设备已受信任，可以在限制开启后登录。" : "当前设备尚未受信任。";
 	}
 
 	function renderTrustedDevices(snapshot) {
 		var list = $("security-trusted-devices");
-		var trustedDevices = snapshot.devices.filter(function (device) { return isTrue(device.is_trusted_desktop); });
+		var trustedDevices = snapshot.devices.filter(function (device) { return isTrue(device.is_trusted_device !== undefined ? device.is_trusted_device : device.is_trusted_desktop); });
 		list.replaceChildren();
-		$("security-device-count").textContent = trustedDevices.length ? (trustedDevices.length + " 台") : "暂无";
+		$("security-device-count").textContent = trustedDevices.length ? (trustedDevices.length + " 个") : "暂无";
 		if (!trustedDevices.length) {
 			var empty = document.createElement("p");
 			empty.className = "empty-state";
-			empty.textContent = "还没有已信任的电脑。";
+			empty.textContent = "还没有已信任的设备。";
 			list.appendChild(empty);
 			return;
 		}
@@ -184,10 +200,11 @@
 		var current = snapshot.currentDevice;
 		var trust = $("security-trust-current");
 		$("security-current-device").textContent = currentDeviceMessage(current);
-		trust.disabled = state.securityLoading || !current.id || !isTrue(current.is_desktop) || isTrue(current.is_trusted_desktop);
-		trust.textContent = isTrue(current.is_trusted_desktop) ? "当前设备已信任" : "信任当前设备";
-		$("security-desktop-protection").checked = snapshot.desktopProtectionEnabled;
-		$("security-desktop-protection").disabled = state.securityLoading;
+		var currentTrusted = isTrue(current.is_trusted_device !== undefined ? current.is_trusted_device : current.is_trusted_desktop);
+		trust.disabled = state.securityLoading || !current.id || currentTrusted;
+		trust.textContent = currentTrusted ? "当前设备已信任" : "信任当前设备";
+		$("security-trusted-device-only").checked = snapshot.trustedDeviceOnlyEnabled;
+		$("security-trusted-device-only").disabled = state.securityLoading;
 		$("security-refresh").disabled = state.securityLoading;
 		renderTrustedDevices(snapshot);
 	}
@@ -390,7 +407,7 @@
 		state.securityLoading = true;
 		$("security-refresh").disabled = true;
 		$("security-trust-current").disabled = true;
-		$("security-desktop-protection").disabled = true;
+		$("security-trusted-device-only").disabled = true;
 		if (!message) { setSecurityStatus("正在读取安全设置..."); }
 		return api("LoginSecurity").then(function (payload) {
 			state.security = securitySnapshot(payload);
@@ -427,11 +444,11 @@
 		}, "当前设备已加入信任列表。");
 	}
 
-	function setDesktopProtection(control) {
+	function setTrustedDeviceProtection(control) {
 		var enabled = control.checked;
 		runSecurityAction(control, function () {
-			return api("LoginSecurity::desktopProtection", { method: "POST", body: { enabled: enabled } });
-		}, enabled ? "已开启电脑登录限制。" : "已关闭电脑登录限制。");
+			return api("LoginSecurity::deviceProtection", { method: "POST", body: { enabled: enabled } });
+		}, enabled ? "已开启可信设备登录限制。" : "已关闭可信设备登录限制。");
 	}
 
 	function revokeDevice(id, control) {
@@ -441,12 +458,114 @@
 		}, "已取消该设备的信任。");
 	}
 
+	function inviteStatusLabel(invite) {
+		return { available: "可使用", used: "已使用", expired: "已过期", revoked: "已撤销" }[invite.status] || invite.status || "未知";
+	}
+
+	function renderRegistration() {
+		var registration = state.registration;
+		var mode = $("registration-mode");
+		mode.value = registration.mode === "open" ? "open" : "invite";
+		mode.disabled = state.registrationLoading;
+		$("registration-create-invite").disabled = state.registrationLoading;
+		$("registration-refresh").disabled = state.registrationLoading;
+		var list = $("registration-invites");
+		list.replaceChildren();
+		if (!registration.invites.length) {
+			var empty = document.createElement("p");
+			empty.className = "empty-state";
+			empty.textContent = "还没有生成邀请码。";
+			list.appendChild(empty);
+			return;
+		}
+		registration.invites.forEach(function (invite) {
+			var row = document.createElement("article");
+			var copy = document.createElement("div");
+			var title = document.createElement("strong");
+			var meta = document.createElement("p");
+			row.className = "registration-invite-row";
+			title.textContent = "邀请码 #" + invite.id + " · " + inviteStatusLabel(invite);
+			meta.textContent = "创建：" + formatDateTime(invite.created_at) + "；过期：" + formatDateTime(invite.expires_at) + (invite.used_at ? "；使用：" + formatDateTime(invite.used_at) : "");
+			copy.appendChild(title);
+			copy.appendChild(meta);
+			row.appendChild(copy);
+			if (invite.status === "available") {
+				var revoke = document.createElement("button");
+				revoke.type = "button";
+				revoke.className = "button";
+				revoke.textContent = "撤销";
+				revoke.addEventListener("click", function () { revokeInvite(invite.id, revoke); });
+				row.appendChild(revoke);
+			}
+			list.appendChild(row);
+		});
+	}
+
+	function loadRegistration(message) {
+		if (state.registrationLoading) { return Promise.resolve(); }
+		state.registrationLoading = true;
+		renderRegistration();
+		if (!message) { setRegistrationStatus("正在读取注册设置..."); }
+		return Promise.all([api("RegistrationSettings"), api("RegistrationInvites")]).then(function (payloads) {
+			state.registration.mode = payloads[0] && payloads[0].mode === "open" ? "open" : "invite";
+			state.registration.invites = payloads[1] && Array.isArray(payloads[1].invites) ? payloads[1].invites : [];
+			setRegistrationStatus(message || "");
+		}).catch(function (error) {
+			if (error.status === 401) { showLogin("登录状态已失效，请重新登录。"); }
+			else if (error.status === 403) { showDenied(); }
+			else { setRegistrationStatus(error.message, true); }
+		}).finally(function () {
+			state.registrationLoading = false;
+			renderRegistration();
+		});
+	}
+
+	function saveRegistrationMode(control) {
+		var requestedMode = control.value === "open" ? "open" : "invite";
+		state.registrationLoading = true;
+		renderRegistration();
+		setRegistrationStatus("正在保存注册模式...");
+		api("RegistrationSettings", { method: "POST", body: { mode: requestedMode } }).then(function (payload) {
+			state.registration.mode = payload.mode === "open" ? "open" : "invite";
+			setRegistrationStatus("注册模式已更新。");
+		}).catch(function (error) {
+			setRegistrationStatus(error.message, true);
+		}).finally(function () {
+			state.registrationLoading = false;
+			renderRegistration();
+		});
+	}
+
+	function createInvite(control) {
+		control.disabled = true;
+		setRegistrationStatus("正在生成邀请码...");
+		api("RegistrationInvites", { method: "POST", body: {} }).then(function (payload) {
+			var invite = payload && payload.invite || {};
+			$("registration-code-value").textContent = invite.code || "";
+			$("registration-new-code").hidden = !invite.code;
+			return loadRegistration("邀请码已生成，请立即复制保存。");
+		}).catch(function (error) { setRegistrationStatus(error.message, true); }).finally(function () { control.disabled = false; });
+	}
+
+	function revokeInvite(id, control) {
+		control.disabled = true;
+		api("RegistrationInvites/" + encodeURIComponent(id), { method: "DELETE", body: {} }).then(function () {
+			return loadRegistration("邀请码已撤销。");
+		}).catch(function (error) { setRegistrationStatus(error.message, true); control.disabled = false; });
+	}
+
+	function copyInviteCode() {
+		var code = $("registration-code-value").textContent;
+		if (!code) { return; }
+		navigator.clipboard.writeText(code).then(function () { setRegistrationStatus("邀请码已复制。"); }).catch(function () { setRegistrationStatus("复制失败，请手动选择邀请码。", true); });
+	}
+
 	function loadCurrentUser() {
 		return api("Auth::user").then(function (payload) {
 			state.user = resource(payload);
 			if (!isAdministrator(state.user)) { showDenied(); return; }
 			showDashboard();
-			return Promise.all([loadEvents(), loadSecurity(), loadAuditEvents(1)]);
+			return Promise.all([loadEvents(), loadSecurity(), loadRegistration(), loadAuditEvents(1)]);
 		}).catch(function (error) {
 			if (error.status === 401 || error.status === 419) { showLogin(); return; }
 			showLogin(error.message);
@@ -484,7 +603,11 @@
 		$("audit-next").addEventListener("click", function () { loadAuditEvents(state.audit.page + 1); });
 		$("security-refresh").addEventListener("click", function () { loadSecurity(); });
 		$("security-trust-current").addEventListener("click", function (event) { trustCurrentDevice(event.currentTarget); });
-		$("security-desktop-protection").addEventListener("change", function (event) { setDesktopProtection(event.currentTarget); });
+		$("security-trusted-device-only").addEventListener("change", function (event) { setTrustedDeviceProtection(event.currentTarget); });
+		$("registration-refresh").addEventListener("click", function () { loadRegistration(); });
+		$("registration-mode").addEventListener("change", function (event) { saveRegistrationMode(event.currentTarget); });
+		$("registration-create-invite").addEventListener("click", function (event) { createInvite(event.currentTarget); });
+		$("registration-copy-code").addEventListener("click", copyInviteCode);
 		$("admin-logout").addEventListener("click", logout);
 		$("admin-denied-logout").addEventListener("click", logout);
 	}

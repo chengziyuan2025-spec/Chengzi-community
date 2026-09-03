@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 class OperationAuditMiddleware
@@ -110,11 +110,20 @@ class OperationAuditMiddleware
 		if (str_contains($endpoint, 'albuminvitecodes')) {
 			return 'invite.create';
 		}
-		if (str_contains($endpoint, 'activities')) {
-			return $method === 'DELETE' ? 'activity.delete' : 'activity.create';
-		}
 		if (str_contains($endpoint, 'photocomments') || str_contains($endpoint, 'comment')) {
 			return $method === 'DELETE' ? 'comment.delete' : 'comment.create';
+		}
+		if (str_contains($endpoint, 'registrationinvites')) {
+			return $method === 'DELETE' ? 'registration.invite_revoke' : 'registration.invite_create';
+		}
+		if (str_contains($endpoint, 'registrationsettings')) {
+			return 'registration.mode_update';
+		}
+		if (str_contains($endpoint, 'auth::register')) {
+			return 'user.register';
+		}
+		if (str_contains($endpoint, 'activities')) {
+			return $method === 'DELETE' ? 'activity.delete' : 'activity.create';
 		}
 		if (str_contains($endpoint, 'photo')) {
 			if (str_contains($endpoint, 'title') || str_contains($endpoint, 'rename')) {

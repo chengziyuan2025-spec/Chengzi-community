@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Gallery;
 
 use App\GalleryExtension\Services\ActivityCursor;
-use App\GalleryExtension\Services\GalleryCache;
+use App\GalleryExtension\Services\ActivityFeedCursor;
 use App\Http\Requests\StoreActivityCommentRequest;
 use App\Http\Requests\StoreActivityRequest;
 use App\Jobs\OptimizeActivityMedia;
@@ -13,11 +13,12 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ActivityController extends Controller
 {
-	public function __construct(private readonly ActivityCursor $cursor, private readonly GalleryCache $cache)
+	public function __construct(private readonly ActivityCursor $cursor, private readonly ActivityFeedCursor $feedCursor)
 	{
 	}
 
@@ -34,7 +35,7 @@ class ActivityController extends Controller
 			->select([
 				'gallery_activity_images.id', 'gallery_activity_images.activity_id',
 				'gallery_activity_images.position', 'gallery_activity_images.mime_type',
-				'gallery_activity_images.path', 'gallery_activity_images.display_path', 'gallery_activity_images.width', 'gallery_activity_images.height',
+				'gallery_activity_images.path', 'gallery_activity_images.display_path', 'gallery_activity_images.processing_status', 'gallery_activity_images.width', 'gallery_activity_images.height',
 				'gallery_activity_images.created_at as image_created_at',
 				'gallery_activity_images.updated_at as image_updated_at',
 				'gallery_activities.title as activity_title', 'gallery_activities.body as activity_body',
@@ -62,7 +63,7 @@ class ActivityController extends Controller
 			->join('gallery_activities', 'gallery_activities.id', '=', 'gallery_activity_images.activity_id')
 			->orderByDesc('gallery_activities.id')->orderBy('gallery_activity_images.position')->first([
 				'gallery_activity_images.id', 'gallery_activity_images.activity_id', 'gallery_activity_images.position', 'gallery_activity_images.mime_type',
-				'gallery_activity_images.path', 'gallery_activity_images.display_path', 'gallery_activity_images.width', 'gallery_activity_images.height',
+				'gallery_activity_images.path', 'gallery_activity_images.display_path', 'gallery_activity_images.processing_status', 'gallery_activity_images.width', 'gallery_activity_images.height',
 				'gallery_activity_images.created_at as image_created_at', 'gallery_activity_images.updated_at as image_updated_at',
 				'gallery_activities.title as activity_title', 'gallery_activities.body as activity_body', 'gallery_activities.created_at as activity_created_at', 'gallery_activities.updated_at as activity_updated_at',
 			]);
@@ -74,7 +75,7 @@ class ActivityController extends Controller
 		return response()->json([
 			'album' => [
 				'id' => '__activity_album__',
-				'title' => '动态相册',
+				'title' => '社区动态',
 				'num_photos' => $total,
 				'is_activity_album' => true,
 				'read_only' => true,
@@ -96,20 +97,56 @@ class ActivityController extends Controller
 	public function index(Request $request): JsonResponse
 	{
 		$user = $this->currentUser();
+		if (array_diff(array_keys($request->query->all()), ['limit', 'cursor', 'type', 'scope']) !== []) {
+			abort(422, '动态分页参数无效。');
+		}
 		$limit = min(15, max(1, (int) $request->query('limit', 15)));
-		$page = min(100000, max(1, (int) $request->query('page', 1)));
-		$rows = $this->cache->remember('activities:' . $user->id . ':' . $page, 20, function () use ($page, $limit) {
-			return DB::table('gallery_activities')
+		$type = (string) $request->query('type', 'all');
+		if (!in_array($type, ['all', 'image', 'video'], true)) {
+			abort(422, '动态类型筛选无效。');
+		}
+		$scope = (string) $request->query('scope', 'all');
+		if (!in_array($scope, ['all', 'mine'], true)) {
+			abort(422, '动态范围无效。');
+		}
+		$cursorId = $this->feedCursor->decode($request->query('cursor'), $type, $scope);
+		$query = DB::table('gallery_activities')
 			->join('users', 'users.id', '=', 'gallery_activities.user_id')
-			->orderByDesc('gallery_activities.id')
-			->offset(($page - 1) * $limit)
+			->orderByDesc('gallery_activities.id');
+		if ($cursorId !== null) {
+			$query->where('gallery_activities.id', '<', $cursorId);
+		}
+		if ($scope === 'mine') {
+			$query->where('gallery_activities.user_id', $user->id);
+		}
+		if ($type === 'video') {
+			$query->whereExists(function ($media): void {
+				$media->selectRaw('1')
+					->from('gallery_activity_images')
+					->whereColumn('gallery_activity_images.activity_id', 'gallery_activities.id')
+					->where('gallery_activity_images.mime_type', 'like', 'video/%');
+			});
+		} elseif ($type === 'image') {
+			$query->whereExists(function ($media): void {
+				$media->selectRaw('1')
+					->from('gallery_activity_images')
+					->whereColumn('gallery_activity_images.activity_id', 'gallery_activities.id')
+					->where('gallery_activity_images.mime_type', 'like', 'image/%');
+			});
+			$query->whereNotExists(function ($media): void {
+				$media->selectRaw('1')
+					->from('gallery_activity_images')
+					->whereColumn('gallery_activity_images.activity_id', 'gallery_activities.id')
+					->where('gallery_activity_images.mime_type', 'like', 'video/%');
+			});
+		}
+		$rows = $query
 			->limit($limit + 1)
 			->get([
 				'gallery_activities.id', 'gallery_activities.user_id', 'gallery_activities.title',
 				'gallery_activities.body', 'gallery_activities.created_at', 'gallery_activities.updated_at',
 				'users.username', 'users.display_name',
 			]);
-		});
 
 		$hasMore = $rows->count() > $limit;
 		$rows = $rows->take($limit)->values();
@@ -122,18 +159,27 @@ class ActivityController extends Controller
 				$images = $imagesByActivity[(int) $row->id] ?? [];
 				return $this->activityPayload($row, array_slice($images, 0, 9), $user, count($images), (int) ($commentCounts[(int) $row->id] ?? 0));
 			})->all(),
-			'pagination' => ['page' => $page, 'has_more' => $hasMore],
+			'pagination' => [
+				'has_more' => $hasMore,
+				'next_cursor' => $hasMore && $rows->isNotEmpty() ? $this->feedCursor->encode($rows->last(), $type, $scope) : null,
+			],
 		]);
 	}
 
 	public function images(Request $request, int $activityId): JsonResponse
 	{
 		$this->currentUser();
+		if (array_diff(array_keys($request->query->all()), ['limit', 'cursor']) !== []) {
+			abort(422, '媒体分页仅支持 limit 和 cursor。');
+		}
 		if (!DB::table('gallery_activities')->where('id', $activityId)->exists()) {
 			abort(404, 'Activity not found.');
 		}
 		$limit = min(9, max(1, (int) $request->query('limit', 9)));
 		$cursor = $this->cursor->decode($request->query('cursor'));
+		if ($cursor !== null && $cursor['activity_id'] !== $activityId) {
+			abort(422, '该媒体游标不属于当前动态。');
+		}
 		$query = DB::table('gallery_activity_images')
 			->where('activity_id', $activityId)
 			->orderBy('position')->orderBy('id');
@@ -144,15 +190,22 @@ class ActivityController extends Controller
 				});
 			});
 		}
-		$rows = $query->limit($limit + 1)->get(['id', 'activity_id', 'position', 'path', 'display_path', 'mime_type', 'width', 'height', 'created_at', 'updated_at']);
+		$rows = $query->limit($limit + 1)->get(['id', 'activity_id', 'position', 'path', 'display_path', 'processing_status', 'mime_type', 'width', 'height', 'created_at', 'updated_at']);
 		$hasMore = $rows->count() > $limit;
-		$images = $rows->take($limit)->filter(fn ($image) => $this->resolveActivityImagePath($image) !== null)->values();
+		$pageRows = $rows->take($limit)->values();
+		$images = $pageRows->filter(fn ($image) => $this->resolveActivityImagePath($image) !== null)->values();
+
+		$pagination = [
+			'has_more' => $hasMore,
+			'next_cursor' => $hasMore && $pageRows->isNotEmpty() ? $this->cursor->encode($pageRows->last()) : null,
+		];
 
 		return response()->json([
 			'images' => $images->take($limit)->map(fn ($image) => $this->imagePayload($activityId, $image))->values()->all(),
 			'image_count' => DB::table('gallery_activity_images')->where('activity_id', $activityId)->count(),
-			'has_more' => $hasMore,
-			'next_cursor' => $hasMore && $images->isNotEmpty() ? $this->cursor->encode($images->last()) : null,
+			'pagination' => $pagination,
+			'has_more' => $pagination['has_more'],
+			'next_cursor' => $pagination['next_cursor'],
 		]);
 	}
 
@@ -203,7 +256,6 @@ class ActivityController extends Controller
 				'users.username', 'users.display_name',
 			]);
 
-		$this->cache->forgetActivities();
 		return response()->json(['comment' => $this->commentPayload($comment, $user)], 201);
 	}
 
@@ -247,7 +299,14 @@ class ActivityController extends Controller
 			if ((int) $activity->user_id !== (int) $user->id && !(bool) $user->may_administrate) {
 				abort(403, 'You cannot delete this activity.');
 			}
-			$paths = DB::table('gallery_activity_images')->where('activity_id', $activityId)->pluck('path')->all();
+			$paths = DB::table('gallery_activity_images')
+				->where('activity_id', $activityId)
+				->lockForUpdate()
+				->get(['path', 'display_path'])
+				->flatMap(static fn ($media) => array_filter([(string) $media->path, (string) ($media->display_path ?? '')]))
+				->unique()
+				->values()
+				->all();
 			DB::table('gallery_activity_images')->where('activity_id', $activityId)->delete();
 			DB::table('gallery_activity_comments')->where('activity_id', $activityId)->delete();
 			DB::table('gallery_activities')->where('id', $activityId)->delete();
@@ -255,10 +314,11 @@ class ActivityController extends Controller
 		});
 
 		foreach ($paths as $path) {
-			$this->deleteStoredImage((string) $path);
+			if (!$this->deleteStoredImage((string) $path)) {
+				Log::warning('Unable to delete activity media file.', ['activity_id' => $activityId, 'path' => $path]);
+			}
 		}
 
-		$this->cache->forgetActivities();
 		return response()->json(['ok' => true]);
 	}
 
@@ -270,25 +330,31 @@ class ActivityController extends Controller
 		$files = array_values(array_filter((array) $request->file('images', [])));
 
 		$now = now();
-		[$activityId, $imageIds] = DB::transaction(function () use ($user, $title, $body, $files, $now): array {
-			$id = DB::table('gallery_activities')->insertGetId([
-				'user_id' => $user->id,
-				'title' => $title,
-				'body' => $body,
-				'created_at' => $now,
-				'updated_at' => $now,
-			]);
-			$imageIds = [];
-			foreach ($files as $position => $file) {
-				$imageIds[] = $this->storeImage($id, $position, $file, $now);
+		$storedPaths = [];
+		try {
+			[$activityId, $imageIds] = DB::transaction(function () use ($user, $title, $body, $files, $now, &$storedPaths): array {
+				$id = DB::table('gallery_activities')->insertGetId([
+					'user_id' => $user->id,
+					'title' => $title,
+					'body' => $body,
+					'created_at' => $now,
+					'updated_at' => $now,
+				]);
+				$imageIds = [];
+				foreach ($files as $position => $file) {
+					$imageIds[] = $this->storeImage($id, $position, $file, $now, $storedPaths);
+				}
+				return [$id, $imageIds];
+			});
+		} catch (\Throwable $exception) {
+			foreach ($storedPaths as $storedPath) {
+				$this->deleteStoredImage($storedPath);
 			}
-			return [$id, $imageIds];
-		});
+			throw $exception;
+		}
 		foreach ($imageIds as $imageId) {
 			OptimizeActivityMedia::dispatch($imageId)->afterCommit();
 		}
-		$this->cache->forgetActivities();
-
 		$row = DB::table('gallery_activities')
 			->join('users', 'users.id', '=', 'gallery_activities.user_id')
 			->where('gallery_activities.id', $activityId)
@@ -346,7 +412,7 @@ class ActivityController extends Controller
 		return $user;
 	}
 
-	private function storeImage(int $activityId, int $position, object $file, $now): int
+	private function storeImage(int $activityId, int $position, object $file, $now, array &$storedPaths): int
 	{
 		if (!$file->isValid()) {
 			abort(422, 'Invalid uploaded image.');
@@ -375,6 +441,7 @@ class ActivityController extends Controller
 		$destination = $directory . '/' . $filename;
 		if (str_starts_with($mime, 'video/')) {
 			$file->move($directory, $filename);
+			$storedPaths[] = $relativeDir . '/' . $filename;
 			[$width, $height] = $this->videoDimensions($destination);
 		} elseif (in_array($mime, ['image/heic', 'image/heif'], true)) {
 			try {
@@ -384,6 +451,7 @@ class ActivityController extends Controller
 				$image->clear();
 				$image->destroy();
 				$file->move($directory, $filename);
+				$storedPaths[] = $relativeDir . '/' . $filename;
 			} catch (\Throwable) {
 				@unlink($destination);
 				abort(422, 'This HEIC/HEIF image cannot be inspected.');
@@ -396,6 +464,7 @@ class ActivityController extends Controller
 			$width = (int) $info[0];
 			$height = (int) $info[1];
 			$file->move($directory, $filename);
+			$storedPaths[] = $relativeDir . '/' . $filename;
 		}
 		return (int) DB::table('gallery_activity_images')->insertGetId([
 			'activity_id' => $activityId,
@@ -415,7 +484,7 @@ class ActivityController extends Controller
 		return DB::table('gallery_activity_images')
 			->where('activity_id', $activityId)
 			->orderBy('position')
-			->get(['id', 'activity_id', 'position', 'path', 'display_path', 'mime_type', 'width', 'height', 'created_at', 'updated_at'])
+			->get(['id', 'activity_id', 'position', 'path', 'display_path', 'processing_status', 'mime_type', 'width', 'height', 'created_at', 'updated_at'])
 			->filter(fn ($image) => $this->resolveActivityImagePath($image) !== null)
 			->take(9)
 			->values();
@@ -433,7 +502,7 @@ class ActivityController extends Controller
 			->whereIn('activity_id', $activityIds)
 			->orderBy('activity_id')
 			->orderBy('position')
-			->get(['id', 'activity_id', 'position', 'path', 'display_path', 'mime_type', 'width', 'height', 'created_at', 'updated_at']);
+			->get(['id', 'activity_id', 'position', 'path', 'display_path', 'processing_status', 'mime_type', 'width', 'height', 'created_at', 'updated_at']);
 
 		foreach ($images as $image) {
 			$activityId = (int) $image->activity_id;
@@ -466,6 +535,7 @@ class ActivityController extends Controller
 			'type' => str_starts_with($mime, 'video/') ? 'video' : 'image',
 			'mime' => $mime,
 			'mime_type' => $mime,
+			'processing_status' => (string) ($image->processing_status ?? 'ready'),
 			'width' => $width,
 			'height' => $height,
 			'title' => $title,
@@ -549,16 +619,20 @@ class ActivityController extends Controller
 		return str_ends_with(strtolower($path), '.mp4') ? 'video/mp4' : 'image/webp';
 	}
 
-	private function deleteStoredImage(string $path): void
+	private function deleteStoredImage(string $path): bool
 	{
 		$storedPath = $this->resolveStoredImagePath($path);
-		if ($storedPath !== null) {
-			@unlink($storedPath);
+		if ($storedPath === null) {
+			return !is_file(public_path($path));
 		}
+
+		return @unlink($storedPath);
 	}
 
 	private function activityPayload(object $row, $images, User $currentUser, int $imageCount, int $commentCount = 0): array
 	{
+		$media = collect($images)->values();
+		$hasMoreImages = $imageCount > $media->count();
 		return [
 			'id' => (int) $row->id,
 			'user_id' => (int) $row->user_id,
@@ -572,7 +646,11 @@ class ActivityController extends Controller
 			'can_delete' => (int) $row->user_id === (int) $currentUser->id || (bool) $currentUser->may_administrate,
 			'image_count' => $imageCount,
 			'comment_count' => $commentCount,
-			'images' => collect($images)->map(fn ($image) => $this->imagePayload((int) $row->id, $image))->values()->all(),
+			'images' => $media->map(fn ($image) => $this->imagePayload((int) $row->id, $image))->values()->all(),
+			'images_pagination' => [
+				'has_more' => $hasMoreImages,
+				'next_cursor' => $hasMoreImages && $media->isNotEmpty() ? $this->cursor->encode($media->last()) : null,
+			],
 		];
 	}
 }

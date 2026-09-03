@@ -5,11 +5,14 @@ use App\Http\Controllers\Gallery\ActivityController;
 use App\Http\Controllers\Gallery\AuthRegisterController;
 use App\Http\Controllers\Gallery\LoginSecurityController;
 use App\Http\Controllers\Gallery\OperationAuditController;
+use App\Http\Controllers\Gallery\RegistrationController;
 use App\Http\Middleware\GalleryApiMiddleware;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/Auth::register', [AuthRegisterController::class, 'register'])
 	->middleware([GalleryApiMiddleware::class, 'throttle:10,1']);
+Route::get('/Auth::registration', [RegistrationController::class, 'status'])
+	->middleware([GalleryApiMiddleware::class, 'throttle:60,1']);
 
 Route::middleware(['login_required:always', GalleryApiMiddleware::class])->group(function (): void {
 	Route::get('/AccountLoginEvents', [AccountLoginController::class, 'index']);
@@ -23,8 +26,14 @@ Route::middleware(['login_required:always', GalleryApiMiddleware::class])->group
 	Route::get('/LoginSecurity', [LoginSecurityController::class, 'index']);
 	Route::post('/LoginSecurity::trust', [LoginSecurityController::class, 'trustCurrentDevice'])->middleware('throttle:10,1');
 	Route::post('/LoginSecurity::desktopProtection', [LoginSecurityController::class, 'setDesktopProtection'])->middleware('throttle:10,1');
+	Route::post('/LoginSecurity::deviceProtection', [LoginSecurityController::class, 'setDesktopProtection'])->middleware('throttle:10,1');
 	Route::post('/LoginSecurity::revoke/{id}', [LoginSecurityController::class, 'revokeDevice'])->middleware('throttle:10,1');
 	Route::get('/OperationAuditEvents', [OperationAuditController::class, 'index']);
+	Route::get('/RegistrationSettings', [RegistrationController::class, 'settings']);
+	Route::post('/RegistrationSettings', [RegistrationController::class, 'updateSettings'])->middleware('throttle:10,1');
+	Route::get('/RegistrationInvites', [RegistrationController::class, 'invites']);
+	Route::post('/RegistrationInvites', [RegistrationController::class, 'createInvite'])->middleware('throttle:20,1');
+	Route::delete('/RegistrationInvites/{id}', [RegistrationController::class, 'revokeInvite'])->middleware('throttle:20,1');
 });
 
 Route::get('/ActivityImages/{activityId}/{imageId}', [ActivityController::class, 'image'])

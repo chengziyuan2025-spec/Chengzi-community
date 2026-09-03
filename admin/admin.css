@@ -29,7 +29,7 @@ input:not([type="checkbox"]), select { width: 100%; min-height: 44px; padding: 1
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-heading .section-copy { margin-bottom: 0; }
 .action-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.security-panel, .audit-panel { margin: 28px 0; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.security-panel, .registration-panel, .audit-panel { margin: 28px 0; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .panel-heading, .current-device, .trusted-devices-heading, .trusted-device-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .panel-heading { align-items: flex-start; margin-bottom: 20px; }
 .panel-heading .section-label { margin-bottom: 4px; }
@@ -56,6 +56,17 @@ input:not([type="checkbox"]), select { width: 100%; min-height: 44px; padding: 1
 .trusted-device-meta { margin-top: 3px !important; color: var(--muted); font-size: 13px; }
 .trusted-device-current { margin-top: 3px !important; color: var(--focus); font-size: 13px; }
 .trusted-device-row .button { flex: 0 0 auto; }
+.registration-controls, .registration-new-code, .registration-invite-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.registration-controls { margin-bottom: 12px; }
+.registration-controls label { display: grid; gap: 6px; min-width: min(260px, 100%); color: var(--muted); font-size: 13px; }
+.registration-controls select { min-height: 40px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
+.registration-new-code { margin: 14px 0; padding: 14px; border: 1px dashed var(--focus); border-radius: 10px; background: rgba(47, 92, 176, .05); }
+.registration-new-code div { display: grid; gap: 5px; }
+.registration-new-code small, .registration-invite-row p { margin: 0; color: var(--muted); font-size: 13px; }
+.registration-new-code strong { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 18px; letter-spacing: .06em; }
+.registration-invite-list { border-top: 1px solid var(--line); }
+.registration-invite-row { align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.registration-invite-row div { display: grid; gap: 5px; min-width: 0; }
 .audit-filters { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(150px, .7fr) auto; align-items: end; gap: 12px; }
 .audit-filters label { min-width: 0; }
 .audit-filters .button { min-width: 72px; }
@@ -82,4 +93,4 @@ input:not([type="checkbox"]), select { width: 100%; min-height: 44px; padding: 1
 .event-item dt { color: var(--muted); }
 .event-item dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .empty-state { margin: 0; padding: 28px 20px; color: var(--muted); text-align: center; }
-@media (max-width: 700px) { .admin-main { padding-top: 32px; } .auth-panel, .notice-panel { margin-top: 32px; padding: 24px; } .page-heading, .panel-heading, .current-device, .trusted-device-row, .audit-event-heading { align-items: stretch; flex-direction: column; } .action-row { width: 100%; } .action-row .button, .panel-heading .button, .current-device .button, .trusted-device-row .button { flex: 1 1 auto; } .security-panel, .audit-panel { padding: 18px 16px; } .audit-filters { grid-template-columns: 1fr; } .audit-filters .button { width: 100%; } .audit-event-heading { gap: 3px; } .audit-event-item dl { grid-template-columns: 1fr; gap: 2px; } .audit-event-item dt { margin-top: 10px; } .audit-pagination { justify-content: stretch; } .audit-pagination .button { flex: 1 1 0; } .audit-page-indicator { min-width: 0; flex: 0 1 auto; } .event-item { padding: 18px 16px; } .event-item dl { grid-template-columns: 1fr; gap: 2px; } .event-item dt { margin-top: 10px; } }
+@media (max-width: 700px) { .admin-main { padding-top: 32px; } .auth-panel, .notice-panel { margin-top: 32px; padding: 24px; } .page-heading, .panel-heading, .current-device, .trusted-device-row, .registration-controls, .registration-new-code, .registration-invite-row, .audit-event-heading { align-items: stretch; flex-direction: column; } .action-row { width: 100%; } .action-row .button, .panel-heading .button, .current-device .button, .trusted-device-row .button { flex: 1 1 auto; } .security-panel, .registration-panel, .audit-panel { padding: 18px 16px; } .audit-filters { grid-template-columns: 1fr; } .audit-filters .button { width: 100%; } .audit-event-heading { gap: 3px; } .audit-event-item dl { grid-template-columns: 1fr; gap: 2px; } .audit-event-item dt { margin-top: 10px; } .audit-pagination { justify-content: stretch; } .audit-pagination .button { flex: 1 1 0; } .audit-page-indicator { min-width: 0; flex: 0 1 auto; } .event-item { padding: 18px 16px; } .event-item dl { grid-template-columns: 1fr; gap: 2px; } .event-item dt { margin-top: 10px; } }

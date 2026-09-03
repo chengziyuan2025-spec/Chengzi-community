@@ -5,12 +5,12 @@
 ## 功能
 
 - 登录与会话恢复（CSRF + 同源 Cookie）
-- 开放自助注册（用户名 3~40 字，密码 ≥8 位，注册后自动登录）
-- 动态流 + 无限滚动（每页 15 条，加密游标/分页）
-- 发布动态：标题 ≤120 字、正文 ≤5000 字、最多 20 个媒体文件（JPG/PNG/WebP/GIF/HEIC/HEIF + MP4/MOV/WebM）
+- 默认邀请注册，可由管理员切换开放注册；邀请码一次性使用、默认 7 天有效
+- 动态流服务端图片/视频筛选（每批 15 条、按动态 ID 倒序的 1 小时加密游标）
+- 发布动态：标题 ≤120 字、正文 ≤5000 字、最多 20 个媒体文件；图片 ≤25MB、视频 ≤250MB、总计 ≤500MB
 - 动态详情：图片轮播、视频播放、评论与回复（≤500 字）
 - 进入记录（仅管理员可查看）
-- 管理员中心 `/gallery/myadmin`：进入记录、设备访问限制、操作审计
+- 管理员中心 `/gallery/myadmin`：进入记录、可信设备、注册控制、邀请码和操作审计
 - 全界面中文，支持暗色模式
 - 强制 HTTPS、CSRF 防护、XSS 过滤
 
@@ -23,7 +23,7 @@
 | `styles.css` | 毛玻璃风格样式表，响应式 + 暗色模式 |
 | `admin/` | `/gallery/myadmin` 管理员中心 |
 | `AccountLoginController.php` | 进入记录 API |
-| `AuthRegisterController.php` | 开放注册 API |
+| `AuthRegisterController.php` / `RegistrationController.php` | 注册与邀请码 API |
 | `ActivityController.php` | 动态 / 评论 API |
 | `LoginSecurityController.php` / `LoginSecurityMiddleware.php` | 设备信任与登录封禁 |
 | `OperationAuditController.php` / `OperationAuditMiddleware.php` | 操作审计 |
@@ -57,14 +57,29 @@ bash /config/codex-custom-frontend/20-install-custom-gallery.sh
 docker restart <container>
 ```
 
+### 首次创建管理员
+
+全新数据库第一次打开社区时会显示“创建初始管理员”。首个成功创建的账号会成为管理员，完成后该入口永久关闭，后续注册恢复为默认的邀请码模式。
+
+此流程不使用初始化密钥。请先在本机或可信网络完成管理员创建，再将站点暴露到公网，避免初始账号被他人抢注。
+
+如果升级前已经注册了普通账号但系统中没有管理员，网页不会重新开放初始化。请在容器中将指定账号提升为管理员：
+
+```sh
+docker exec -it <container> php artisan gallery:admin:promote <username>
+```
+
+用户名必须完全匹配。用户不存在时命令会返回失败；重复执行不会重复修改权限。
+
 注意：社区版与主项目共用线上路径 `/custom-gallery`，**部署会替换现有前端**；回滚 = 用主项目文件重跑安装脚本。动态数据保留在 `gallery_activities` 等表中，不影响数据库。
 
 ### 安全
 
 `default.conf` 已含 HSTS、速率限制、敏感路径屏蔽；安装脚本会强制 `APP_DEBUG=false`、`SESSION_SECURE_COOKIE=true`、`expose_php=Off`。
 
-- 登录安全：同设备连续 5 次密码错误封禁 5 天；管理员可开启「仅允许已信任的电脑登录」
+- 登录安全：用户名+IP 15 分钟内最多失败 5 次，单 IP 最多失败 30 次；管理员可开启「仅允许已信任的设备登录」
 - 操作审计：记录 API 写操作，不含密码、令牌与内容正文
+- 媒体盘点：`php artisan gallery:media-inventory` 只读报告孤儿文件，仅显式增加 `--apply` 才删除
 
 ## 关于 `xhs_work` 的复用边界
 
@@ -81,9 +96,9 @@ docker restart <container>
 ## 验证清单（部署后人工点检）
 
 1. 登录 → 默认进入动态流，底部导航只有「首页 / 发布 / 我的」
-2. 动态流能看到所有用户发布的动态
-3. 注册新账号 → 自动登录 → 可发布带图片/视频的动态，出现在流顶部
-4. 打开动态详情 → 评论、回复正常
-5. 「我的」页面无统计区，退出登录正常
+2. 空数据库首次进入显示「创建初始管理员」，创建后自动登录并可进入管理员中心
+3. 初始化完成后恢复邀请注册；分别验证有效/过期/撤销/重复使用邀请码
+4. 发布 20 个媒体 → 详情滑到末端能逐批看到全部媒体；上传可取消
+5. 「我的」页面可查看并删除自己的动态，退出登录正常
 6. 全站无任何相册/共享码入口；直接访问旧接口（如 `/api/v2/AlbumInviteCodes`）应返回 404/405
 7. 根路径 `/` 与 `/custom-gallery/` 均显示纯动态流，无相册入口

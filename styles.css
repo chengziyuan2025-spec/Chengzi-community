@@ -4526,3 +4526,70 @@ body.amicro-enabled #activities-view .activity-card-meta span + span::before {
 	body.amicro-enabled #activities-view .activity-card-meta { color: #9ba6b2; }
 	body.amicro-enabled #activities-view .activity-card-meta span + span::before { color: #68737f; }
 }
+
+/* Community stability pass: preserve API order and keep controls readable. */
+[hidden] { display: none !important; }
+
+body.amicro-enabled #activities-view .activities-feed {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	column-count: unset;
+	gap: 12px;
+	width: min(800px, 100%);
+}
+
+body.amicro-enabled #activities-view .activity-card {
+	display: block;
+	width: 100%;
+	margin: 0;
+	break-inside: auto;
+}
+
+body.amicro-enabled #activities-view .activity-card-meta,
+body.amicro-enabled #activities-view .activity-author time,
+body.amicro-enabled #activities-view .activity-author strong {
+	font-size: 12px;
+}
+
+body.amicro-enabled .activity-detail-author time,
+body.amicro-enabled .activity-comment-actions,
+body.amicro-enabled .card-meta { font-size: 12px; }
+
+.profile-actions { display: grid; gap: 10px; width: min(420px, 100%); margin: 18px auto 0; }
+.compose-media-help { margin: 10px 0; color: var(--text-muted, #727b86); font-size: 12px; line-height: 1.55; }
+.activity-upload-progress { height: 6px; overflow: hidden; margin: 10px 0; border-radius: 999px; background: rgba(80, 90, 105, .14); }
+.activity-upload-progress > span { display: block; width: 0; height: 100%; border-radius: inherit; background: #e15d63; transition: width .15s linear; }
+.activity-delete-trigger { margin-left: auto; padding: 4px 7px; border: 0; border-radius: 5px; background: transparent; color: #b42318; font: inherit; font-size: 12px; cursor: pointer; }
+.activity-delete-trigger:hover, .activity-delete-trigger:focus-visible { background: rgba(180, 35, 24, .1); }
+.activity-detail-delete { align-self: center; }
+.activities-feed-header .back-link { margin: 0 0 10px; }
+.activity-delete-dialog[aria-hidden="false"] { display: grid; }
+
+@media (min-width: 900px) {
+	body.amicro-enabled .bottom-navigation {
+		inset: 50% auto auto 24px;
+		transform: translateY(-50%);
+		width: 76px;
+		min-height: 220px;
+		padding: 10px 7px;
+		border-radius: 28px;
+		flex-direction: column;
+	}
+	body.amicro-enabled .bottom-navigation:not(.has-context-action) { width: 76px; }
+	body.amicro-enabled .bottom-navigation-item { width: 100%; min-height: 62px; flex-direction: column; gap: 3px; }
+	body.amicro-enabled .bottom-fab { position: static; order: 2; flex: 0 0 48px; transform: none; }
+	body.amicro-enabled .bottom-navigation-item:first-child { order: 1; }
+	body.amicro-enabled .bottom-navigation-item:last-child { order: 3; }
+	body.amicro-enabled[data-view="activities-view"] main,
+	body.amicro-enabled[data-view="profile-view"] main { padding-left: 116px; }
+}
+
+@media (max-width: 520px) {
+	body.amicro-enabled #activities-view .activities-feed { gap: 8px; }
+}
+
+@media (prefers-color-scheme: dark) {
+	.activity-delete-panel { background: #24282e; color: #f4f6f8; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); }
+	.activity-delete-panel p, .compose-media-help { color: #aeb7c2; }
+	.activity-upload-progress { background: rgba(255, 255, 255, .14); }
+}
